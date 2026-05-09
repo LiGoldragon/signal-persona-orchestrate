@@ -1,17 +1,16 @@
-# ARCHITECTURE — signal-persona-orchestrate
+# ARCHITECTURE — signal-persona-mind
 
-The Signal contract between **`orchestrate`** (the CLI client
-agents invoke per call) and **`persona-orchestrate`** (the
-typed orchestration state actor that owns
-`orchestrate.redb`). The whole channel is one
+The Signal contract between **`mind`** (the CLI client
+agents invoke per call) and **`persona-mind`** (the
+central state actor that owns `mind.redb`). The whole channel is one
 `signal_channel!` invocation in `src/lib.rs`.
 
 ## Channel
 
 | Side | Component |
 |---|---|
-| Request side | `orchestrate` CLI (one Nota record per agent invocation; constructed inside the binary's argv parser) |
-| Reply side | `persona-orchestrate` state actor |
+| Request side | `mind` CLI (one Nota record per agent invocation; constructed inside the binary's argv parser) |
+| Reply side | `persona-mind` state actor |
 
 The CLI opens the database, runs one operation, prints one
 reply, exits. Concurrent invocations serialize at the redb
@@ -21,8 +20,8 @@ level; multiple readers run in parallel.
 
 This contract defines its records locally (`RoleName`,
 `ScopeReference`, `WirePath`, `TaskToken`, `ScopeReason`,
-`TimestampNanos`, etc.) because they're the channel's
-vocabulary, not records that travel beyond.
+`TimestampNanos`, item identifiers, notes, edges, events, etc.) because
+they're the mind channel's vocabulary, not records that travel beyond.
 
 Boundary strings are validated at construction time:
 `WirePath` accepts absolute paths and stores a normalized
@@ -39,15 +38,22 @@ local.
 ## Messages
 
 ```
-OrchestrateRequest                 OrchestrateReply
+MindRequest                 MindReply
 ├─ RoleClaim                       ├─ ClaimAcceptance
 ├─ RoleRelease                     ├─ ClaimRejection
 ├─ RoleHandoff                     ├─ ReleaseAcknowledgment
 ├─ RoleObservation                 ├─ HandoffAcceptance
 ├─ ActivitySubmission              ├─ HandoffRejection
-└─ ActivityQuery                   ├─ RoleSnapshot
-                                   ├─ ActivityAcknowledgment
-                                   └─ ActivityList
+├─ ActivityQuery                   ├─ RoleSnapshot
+├─ Open                            ├─ ActivityAcknowledgment
+├─ AddNote                         ├─ ActivityList
+├─ Link                            ├─ Opened
+├─ ChangeStatus                    ├─ NoteAdded
+├─ AddAlias                        ├─ Linked
+└─ Query                           ├─ StatusChanged
+                                   ├─ AliasAdded
+                                   ├─ View
+                                   └─ Rejected
 ```
 
 Closed enums; no `Unknown` variant. Conflicts and rejections
@@ -58,14 +64,14 @@ so callers pattern-match on them rather than parsing strings.
 
 `signal_core::Frame` carries the protocol version. Schema-level
 changes (adding/removing variants, adding fields) are breaking
-and require a coordinated upgrade of both `orchestrate` clients
-and `persona-orchestrate`.
+and require a coordinated upgrade of both `mind` clients
+and `persona-mind`.
 
 ## Examples
 
 ```text
 ;; agent claims paths + task scope
-OrchestrateRequest::RoleClaim(RoleClaim {
+MindRequest::RoleClaim(RoleClaim {
     role: RoleName::Designer,
     scopes: vec![
         ScopeReference::Path(WirePath::from_absolute_path("/git/.../signal/ARCHITECTURE.md")?),
@@ -75,13 +81,13 @@ OrchestrateRequest::RoleClaim(RoleClaim {
 })
 
 ;; on success
-OrchestrateReply::ClaimAcceptance(ClaimAcceptance {
+MindReply::ClaimAcceptance(ClaimAcceptance {
     role: RoleName::Designer,
     scopes: vec![/* echoed */],
 })
 
 ;; on conflict
-OrchestrateReply::ClaimRejection(ClaimRejection {
+MindReply::ClaimRejection(ClaimRejection {
     role: RoleName::Designer,
     conflicts: vec![ScopeConflict {
         scope: ScopeReference::Path(WirePath::from_absolute_path("/git/.../signal/ARCHITECTURE.md")?),
@@ -91,21 +97,30 @@ OrchestrateReply::ClaimRejection(ClaimRejection {
 })
 
 ;; agent files an activity entry
-OrchestrateRequest::ActivitySubmission(ActivitySubmission {
+MindRequest::ActivitySubmission(ActivitySubmission {
     role: RoleName::Operator,
     scope: ScopeReference::Path(WirePath::from_absolute_path("/git/.../persona-router/src/router.rs")?),
     reason: ScopeReason::from_text("RouterActor consumes signal-persona-system Frame")?,
 })
 
 ;; reply
-OrchestrateReply::ActivityAcknowledgment(ActivityAcknowledgment { slot: 1024 })
+MindReply::ActivityAcknowledgment(ActivityAcknowledgment { slot: 1024 })
+
+;; open a memory/work item
+MindRequest::Open(Opening {
+    kind: Kind::Task,
+    priority: Priority::High,
+    title: Title::new("Replace BEADS"),
+    body: Body::new("Open a typed mind item."),
+})
 ```
 
 ## Round trips
 
 Per-variant round-trip tests in `tests/round_trip.rs` covering
-all 6 request variants + all 8 reply variants + both
-ScopeReference variants + handoff rejection sub-variants.
+all role/activity request variants, all memory/work request variants,
+all reply variants, both `ScopeReference` variants, every `EdgeKind`,
+every `QueryKind`, and every external-reference target.
 
 Architectural-truth tests fire when:
 
@@ -116,11 +131,11 @@ Architectural-truth tests fire when:
 
 ## Non-ownership
 
-- No state actor — that's `persona-orchestrate`.
-- No CLI binary — that's `persona-orchestrate`'s
-  `orchestrate` bin target.
+- No state actor — that's `persona-mind`.
+- No CLI binary — that's `persona-mind`'s
+  `mind` bin target.
 - No database — the typed records persist in
-  `persona-orchestrate`'s `orchestrate.redb`, opened
+  `persona-mind`'s `mind.redb`, opened
   through `persona-sema` (which uses the workspace's `sema`
   database library underneath).
 - No transport (UDS path, reconnect, timeouts) — per
@@ -144,8 +159,8 @@ tests/
 
 ## See also
 
-- `~/primary/reports/designer/93-persona-orchestrate-rust-rewrite-and-activity-log.md`
-  — the design report grounding this contract.
+- `~/primary/reports/operator/100-persona-mind-central-rename-plan.md`
+  — the current design report grounding this contract.
 - `~/primary/reports/designer/4-persona-messaging-design.md`
   — the original Persona messaging design naming the
   orchestration ops.

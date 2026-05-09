@@ -1,15 +1,15 @@
 [package]
-name         = "signal-persona-orchestrate"
+name         = "signal-persona-mind"
 version      = "0.1.0"
 edition      = "2024"
 rust-version = "1.85"
 license      = "MIT OR Apache-2.0"
-repository   = "https://github.com/LiGoldragon/signal-persona-orchestrate"
-description  = "Signal contract — `orchestrate` CLI ↔ persona-orchestrate channel: typed records for role claim/release/handoff/observation plus the workspace activity log."
+repository   = "https://github.com/LiGoldragon/signal-persona-mind"
+description  = "Signal contract — `mind` CLI ↔ persona-mind channel: typed records for role claim/release/handoff/observation plus the workspace activity log."
 publish      = false
 
 [lib]
-name = "signal_persona_orchestrate"
+name = "signal_persona_mind"
 path = "src/lib.rs"
 
 [dependencies]

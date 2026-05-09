@@ -1,5 +1,5 @@
 //! Architectural-truth round-trip tests for the
-//! `signal-persona-orchestrate` channel.
+//! `signal-persona-mind` channel.
 //!
 //! Per `~/primary/skills/architectural-truth-tests.md`,
 //! each variant of both enums has a witness test that
@@ -7,18 +7,23 @@
 //! length-prefixed Frame.
 
 use signal_core::{FrameBody, Reply, Request, SemaVerb};
-use signal_persona_orchestrate::{
+use signal_persona_mind::{
     Activity, ActivityAcknowledgment, ActivityFilter, ActivityList, ActivityQuery,
-    ActivitySubmission, ClaimAcceptance, ClaimEntry, ClaimRejection, Frame, HandoffAcceptance,
-    HandoffRejection, HandoffRejectionReason, OrchestrateReply, OrchestrateRequest,
-    ReleaseAcknowledgment, RoleClaim, RoleHandoff, RoleName, RoleObservation, RoleRelease,
-    RoleSnapshot, RoleStatus, ScopeConflict, ScopeReason, ScopeReference, TaskToken,
-    TimestampNanos, WirePath,
+    ActivitySubmission, ActorName, AliasAddedEvent, AliasAssignment, AliasReceipt, BeadsToken,
+    Body, ClaimAcceptance, ClaimEntry, ClaimRejection, CommitHash, DisplayId, Edge, EdgeAddedEvent,
+    EdgeKind, EdgeTarget, Event, EventHeader, EventSeq, ExternalAlias, ExternalReference, Frame,
+    HandoffAcceptance, HandoffRejection, HandoffRejectionReason, Item, ItemOpenedEvent,
+    ItemReference, Kind, Link, LinkReceipt, LinkTarget, MindReply, MindRequest, Note,
+    NoteAddedEvent, NoteReceipt, NoteSubmission, Opening, OpeningReceipt, OperationId, Priority,
+    Query, QueryKind, QueryLimit, ReferencePath, Rejection, RejectionReason, ReleaseAcknowledgment,
+    ReportPath, RoleClaim, RoleHandoff, RoleName, RoleObservation, RoleRelease, RoleSnapshot,
+    RoleStatus, ScopeConflict, ScopeReason, ScopeReference, StableItemId, Status, StatusChange,
+    StatusChangedEvent, StatusReceipt, TaskToken, TimestampNanos, Title, View, WirePath,
 };
 
 // ─── Helpers ──────────────────────────────────────────────
 
-fn round_trip_request(request: OrchestrateRequest) -> OrchestrateRequest {
+fn round_trip_request(request: MindRequest) -> MindRequest {
     let frame = Frame::new(FrameBody::Request(Request::assert(request)));
     let bytes = frame.encode_length_prefixed().expect("encode");
     let decoded = Frame::decode_length_prefixed(&bytes).expect("decode");
@@ -31,7 +36,7 @@ fn round_trip_request(request: OrchestrateRequest) -> OrchestrateRequest {
     }
 }
 
-fn round_trip_reply(reply: OrchestrateReply) -> OrchestrateReply {
+fn round_trip_reply(reply: MindReply) -> MindReply {
     let frame = Frame::new(FrameBody::Reply(Reply::operation(reply)));
     let bytes = frame.encode_length_prefixed().expect("encode");
     let decoded = Frame::decode_length_prefixed(&bytes).expect("decode");
@@ -42,10 +47,8 @@ fn round_trip_reply(reply: OrchestrateReply) -> OrchestrateReply {
 }
 
 fn sample_path() -> WirePath {
-    WirePath::from_absolute_path(
-        "/git/github.com/LiGoldragon/signal-persona-orchestrate/src/lib.rs",
-    )
-    .expect("absolute path")
+    WirePath::from_absolute_path("/git/github.com/LiGoldragon/signal-persona-mind/src/lib.rs")
+        .expect("absolute path")
 }
 
 fn sample_task() -> TaskToken {
@@ -64,11 +67,127 @@ fn sample_task_scope() -> ScopeReference {
     ScopeReference::Task(sample_task())
 }
 
+struct MemoryFixture {
+    item_id: StableItemId,
+    display_id: DisplayId,
+    actor: ActorName,
+    operation: OperationId,
+}
+
+impl MemoryFixture {
+    fn new() -> Self {
+        Self {
+            item_id: StableItemId::new("item-0000000000000001"),
+            display_id: DisplayId::new("9iv"),
+            actor: ActorName::new("operator"),
+            operation: OperationId::new("op-0000000000000001"),
+        }
+    }
+
+    fn header(&self, event: u64) -> EventHeader {
+        EventHeader {
+            event: EventSeq::new(event),
+            operation: self.operation.clone(),
+            actor: self.actor.clone(),
+        }
+    }
+
+    fn item(&self) -> Item {
+        Item {
+            id: self.item_id.clone(),
+            display_id: self.display_id.clone(),
+            aliases: vec![ExternalAlias::new("primary-9iv")],
+            kind: Kind::Task,
+            status: Status::Open,
+            priority: Priority::High,
+            title: Title::new("Implement native mind memory graph"),
+            body: Body::new("Replace BEADS with typed Persona mind records."),
+        }
+    }
+
+    fn opened_event(&self) -> ItemOpenedEvent {
+        ItemOpenedEvent {
+            header: self.header(1),
+            item: self.item(),
+        }
+    }
+
+    fn note(&self) -> Note {
+        Note {
+            event: EventSeq::new(2),
+            item: self.item_id.clone(),
+            author: self.actor.clone(),
+            body: Body::new("First implementation slice is the contract repo."),
+        }
+    }
+
+    fn note_event(&self) -> NoteAddedEvent {
+        NoteAddedEvent {
+            header: self.header(2),
+            note: self.note(),
+        }
+    }
+
+    fn edge(&self) -> Edge {
+        Edge {
+            event: EventSeq::new(3),
+            source: StableItemId::new("item-0000000000000002"),
+            kind: EdgeKind::DependsOn,
+            target: EdgeTarget::Item(self.item_id.clone()),
+            body: Some(Body::new("Implementation waits on the contract.")),
+        }
+    }
+
+    fn edge_event(&self) -> EdgeAddedEvent {
+        EdgeAddedEvent {
+            header: self.header(3),
+            edge: self.edge(),
+        }
+    }
+
+    fn status_event(&self) -> StatusChangedEvent {
+        StatusChangedEvent {
+            header: self.header(4),
+            item: self.item_id.clone(),
+            status: Status::Closed,
+            body: Some(Body::new("Contract shipped.")),
+        }
+    }
+
+    fn alias_event(&self) -> AliasAddedEvent {
+        AliasAddedEvent {
+            header: self.header(5),
+            item: self.item_id.clone(),
+            alias: ExternalAlias::new("primary-9iv"),
+        }
+    }
+
+    fn view(&self) -> View {
+        View {
+            items: vec![self.item()],
+            edges: vec![self.edge()],
+            notes: vec![self.note()],
+            events: vec![
+                Event::ItemOpened(self.opened_event()),
+                Event::NoteAdded(self.note_event()),
+                Event::EdgeAdded(self.edge_event()),
+                Event::StatusChanged(self.status_event()),
+                Event::AliasAdded(self.alias_event()),
+            ],
+        }
+    }
+
+    fn assert_request_round_trips(&self, request: MindRequest) {
+        let decoded = round_trip_request(request.clone());
+        assert_eq!(decoded, request);
+    }
+}
+
 // ─── Request variants ─────────────────────────────────────
 
 #[test]
 fn role_claim_with_paths_round_trips() {
-    let request = OrchestrateRequest::RoleClaim(RoleClaim {
+    let request = MindRequest::RoleClaim(RoleClaim {
         role: RoleName::Designer,
         scopes: vec![sample_path_scope(), sample_task_scope()],
         reason: sample_reason(),
@@ -79,7 +198,7 @@ fn role_claim_with_paths_round_trips() {
 
 #[test]
 fn role_release_round_trips() {
-    let request = OrchestrateRequest::RoleRelease(RoleRelease {
+    let request = MindRequest::RoleRelease(RoleRelease {
         role: RoleName::Operator,
     });
     let decoded = round_trip_request(request.clone());
@@ -88,7 +207,7 @@ fn role_release_round_trips() {
 
 #[test]
 fn role_handoff_round_trips() {
-    let request = OrchestrateRequest::RoleHandoff(RoleHandoff {
+    let request = MindRequest::RoleHandoff(RoleHandoff {
         from: RoleName::Designer,
         to: RoleName::Operator,
         scopes: vec![sample_path_scope()],
@@ -100,14 +219,14 @@ fn role_handoff_round_trips() {
 
 #[test]
 fn role_observation_round_trips() {
-    let request = OrchestrateRequest::RoleObservation(RoleObservation);
+    let request = MindRequest::RoleObservation(RoleObservation);
     let decoded = round_trip_request(request.clone());
     assert_eq!(decoded, request);
 }
 
 #[test]
 fn activity_submission_round_trips() {
-    let request = OrchestrateRequest::ActivitySubmission(ActivitySubmission {
+    let request = MindRequest::ActivitySubmission(ActivitySubmission {
         role: RoleName::Assistant,
         scope: sample_path_scope(),
         reason: ScopeReason::from_text("audit signal-persona-system integration")
@@ -119,7 +238,7 @@ fn activity_submission_round_trips() {
 
 #[test]
 fn activity_query_unfiltered_round_trips() {
-    let request = OrchestrateRequest::ActivityQuery(ActivityQuery {
+    let request = MindRequest::ActivityQuery(ActivityQuery {
         limit: 25,
         filters: vec![],
     });
@@ -129,7 +248,7 @@ fn activity_query_unfiltered_round_trips() {
 
 #[test]
 fn activity_query_with_role_filter_round_trips() {
-    let request = OrchestrateRequest::ActivityQuery(ActivityQuery {
+    let request = MindRequest::ActivityQuery(ActivityQuery {
         limit: 50,
         filters: vec![ActivityFilter::RoleFilter(RoleName::Operator)],
     });
@@ -139,7 +258,7 @@ fn activity_query_with_role_filter_round_trips() {
 
 #[test]
 fn activity_query_with_path_prefix_round_trips() {
-    let request = OrchestrateRequest::ActivityQuery(ActivityQuery {
+    let request = MindRequest::ActivityQuery(ActivityQuery {
         limit: 10,
         filters: vec![ActivityFilter::PathPrefix(
             WirePath::from_absolute_path("/git/github.com/LiGoldragon/persona-router")
@@ -152,7 +271,7 @@ fn activity_query_with_path_prefix_round_trips() {
 
 #[test]
 fn activity_query_with_task_filter_round_trips() {
-    let request = OrchestrateRequest::ActivityQuery(ActivityQuery {
+    let request = MindRequest::ActivityQuery(ActivityQuery {
         limit: 100,
         filters: vec![ActivityFilter::TaskToken(sample_task())],
     });
@@ -160,11 +279,147 @@ fn activity_query_with_task_filter_round_trips() {
     assert_eq!(decoded, request);
 }
 
+#[test]
+fn open_request_round_trips_through_length_prefixed_frame() {
+    let request = MindRequest::Open(Opening {
+        kind: Kind::Task,
+        priority: Priority::High,
+        title: Title::new("Replace BEADS"),
+        body: Body::new("Open a typed mind item."),
+    });
+    let decoded = round_trip_request(request.clone());
+    assert_eq!(decoded, request);
+}
+
+#[test]
+fn add_note_request_round_trips() {
+    let request = MindRequest::AddNote(NoteSubmission {
+        item: ItemReference::Display(DisplayId::new("9iv")),
+        body: Body::new("Append-only note."),
+    });
+    let decoded = round_trip_request(request.clone());
+    assert_eq!(decoded, request);
+}
+
+#[test]
+fn link_request_round_trips_with_typed_edge_kind() {
+    let request = MindRequest::Link(Link {
+        source: ItemReference::Display(DisplayId::new("abc")),
+        kind: EdgeKind::DependsOn,
+        target: LinkTarget::Item(ItemReference::Display(DisplayId::new("9iv"))),
+        body: None,
+    });
+    let decoded = round_trip_request(request.clone());
+    assert_eq!(decoded, request);
+}
+
+#[test]
+fn link_request_round_trips_with_external_report_reference() {
+    let request = MindRequest::Link(Link {
+        source: ItemReference::Display(DisplayId::new("9iv")),
+        kind: EdgeKind::References,
+        target: LinkTarget::External(ExternalReference::Report(ReportPath::new(
+            "reports/operator/100-persona-mind-central-rename-plan.md",
+        ))),
+        body: Some(Body::new("Research basis for this work item.")),
+    });
+    let decoded = round_trip_request(request.clone());
+    assert_eq!(decoded, request);
+}
+
+#[test]
+fn status_change_request_round_trips() {
+    let request = MindRequest::ChangeStatus(StatusChange {
+        item: ItemReference::Alias(ExternalAlias::new("primary-9iv")),
+        status: Status::InProgress,
+        body: Some(Body::new("Operator started it.")),
+    });
+    let decoded = round_trip_request(request.clone());
+    assert_eq!(decoded, request);
+}
+
+#[test]
+fn add_alias_request_round_trips() {
+    let request = MindRequest::AddAlias(AliasAssignment {
+        item: ItemReference::Stable(StableItemId::new("item-0000000000000001")),
+        alias: ExternalAlias::new("primary-9iv"),
+    });
+    let decoded = round_trip_request(request.clone());
+    assert_eq!(decoded, request);
+}
+
+#[test]
+fn every_query_kind_round_trips() {
+    let fixture = MemoryFixture::new();
+    let kinds = vec![
+        QueryKind::Ready,
+        QueryKind::Blocked,
+        QueryKind::Open,
+        QueryKind::RecentEvents,
+        QueryKind::ByItem(ItemReference::Stable(fixture.item_id.clone())),
+        QueryKind::ByKind(Kind::Decision),
+        QueryKind::ByStatus(Status::Closed),
+        QueryKind::ByAlias(ExternalAlias::new("primary-9iv")),
+    ];
+
+    for kind in kinds {
+        fixture.assert_request_round_trips(MindRequest::Query(Query {
+            kind,
+            limit: QueryLimit::new(25),
+        }));
+    }
+}
+
+#[test]
+fn every_edge_kind_round_trips_as_a_link_request() {
+    let fixture = MemoryFixture::new();
+    let kinds = vec![
+        EdgeKind::DependsOn,
+        EdgeKind::ParentOf,
+        EdgeKind::RelatesTo,
+        EdgeKind::Duplicates,
+        EdgeKind::Supersedes,
+        EdgeKind::Answers,
+        EdgeKind::References,
+    ];
+
+    for kind in kinds {
+        fixture.assert_request_round_trips(MindRequest::Link(Link {
+            source: ItemReference::Stable(StableItemId::new("item-0000000000000002")),
+            kind,
+            target: LinkTarget::Item(ItemReference::Stable(fixture.item_id.clone())),
+            body: None,
+        }));
+    }
+}
+
+#[test]
+fn every_external_reference_variant_round_trips_as_a_link_target() {
+    let fixture = MemoryFixture::new();
+    let targets = vec![
+        ExternalReference::Report(ReportPath::new("reports/operator/100-mind.md")),
+        ExternalReference::GitCommit(CommitHash::new("7f0bf022")),
+        ExternalReference::BeadsTask(BeadsToken::new("primary-9iv")),
+        ExternalReference::File(ReferencePath::new(
+            "/git/github.com/LiGoldragon/persona-mind/src/lib.rs",
+        )),
+    ];
+
+    for target in targets {
+        fixture.assert_request_round_trips(MindRequest::Link(Link {
+            source: ItemReference::Stable(fixture.item_id.clone()),
+            kind: EdgeKind::References,
+            target: LinkTarget::External(target),
+            body: Some(Body::new("typed external reference")),
+        }));
+    }
+}
+
 // ─── Reply variants ───────────────────────────────────────
 
 #[test]
 fn claim_acceptance_round_trips() {
-    let reply = OrchestrateReply::ClaimAcceptance(ClaimAcceptance {
+    let reply = MindReply::ClaimAcceptance(ClaimAcceptance {
         role: RoleName::Designer,
         scopes: vec![sample_path_scope()],
     });
@@ -174,7 +429,7 @@ fn claim_acceptance_round_trips() {
 
 #[test]
 fn claim_rejection_round_trips() {
-    let reply = OrchestrateReply::ClaimRejection(ClaimRejection {
+    let reply = MindReply::ClaimRejection(ClaimRejection {
         role: RoleName::Designer,
         conflicts: vec![ScopeConflict {
             scope: sample_path_scope(),
@@ -188,7 +443,7 @@ fn claim_rejection_round_trips() {
 
 #[test]
 fn release_acknowledgment_round_trips() {
-    let reply = OrchestrateReply::ReleaseAcknowledgment(ReleaseAcknowledgment {
+    let reply = MindReply::ReleaseAcknowledgment(ReleaseAcknowledgment {
         role: RoleName::Designer,
         released_scopes: vec![sample_path_scope(), sample_task_scope()],
     });
@@ -198,7 +453,7 @@ fn release_acknowledgment_round_trips() {
 
 #[test]
 fn handoff_acceptance_round_trips() {
-    let reply = OrchestrateReply::HandoffAcceptance(HandoffAcceptance {
+    let reply = MindReply::HandoffAcceptance(HandoffAcceptance {
         from: RoleName::Designer,
         to: RoleName::Operator,
         scopes: vec![sample_path_scope()],
@@ -209,7 +464,7 @@ fn handoff_acceptance_round_trips() {
 
 #[test]
 fn handoff_rejection_source_does_not_hold_round_trips() {
-    let reply = OrchestrateReply::HandoffRejection(HandoffRejection {
+    let reply = MindReply::HandoffRejection(HandoffRejection {
         from: RoleName::Designer,
         to: RoleName::Operator,
         reason: HandoffRejectionReason::SourceRoleDoesNotHold,
@@ -220,7 +475,7 @@ fn handoff_rejection_source_does_not_hold_round_trips() {
 
 #[test]
 fn handoff_rejection_target_conflict_round_trips() {
-    let reply = OrchestrateReply::HandoffRejection(HandoffRejection {
+    let reply = MindReply::HandoffRejection(HandoffRejection {
         from: RoleName::Designer,
         to: RoleName::Operator,
         reason: HandoffRejectionReason::TargetRoleConflict(vec![ScopeConflict {
@@ -235,7 +490,7 @@ fn handoff_rejection_target_conflict_round_trips() {
 
 #[test]
 fn role_snapshot_round_trips() {
-    let reply = OrchestrateReply::RoleSnapshot(RoleSnapshot {
+    let reply = MindReply::RoleSnapshot(RoleSnapshot {
         roles: vec![
             RoleStatus {
                 role: RoleName::Designer,
@@ -262,14 +517,14 @@ fn role_snapshot_round_trips() {
 
 #[test]
 fn activity_acknowledgment_round_trips() {
-    let reply = OrchestrateReply::ActivityAcknowledgment(ActivityAcknowledgment { slot: 42 });
+    let reply = MindReply::ActivityAcknowledgment(ActivityAcknowledgment { slot: 42 });
     let decoded = round_trip_reply(reply.clone());
     assert_eq!(decoded, reply);
 }
 
 #[test]
 fn activity_list_round_trips() {
-    let reply = OrchestrateReply::ActivityList(ActivityList {
+    let reply = MindReply::ActivityList(ActivityList {
         records: vec![
             Activity {
                 role: RoleName::Designer,
@@ -289,11 +544,61 @@ fn activity_list_round_trips() {
     assert_eq!(decoded, reply);
 }
 
+#[test]
+fn memory_receipt_replies_round_trip() {
+    let fixture = MemoryFixture::new();
+    let replies = vec![
+        MindReply::Opened(OpeningReceipt {
+            event: fixture.opened_event(),
+        }),
+        MindReply::NoteAdded(NoteReceipt {
+            event: fixture.note_event(),
+        }),
+        MindReply::Linked(LinkReceipt {
+            event: fixture.edge_event(),
+        }),
+        MindReply::StatusChanged(StatusReceipt {
+            event: fixture.status_event(),
+        }),
+        MindReply::AliasAdded(AliasReceipt {
+            event: fixture.alias_event(),
+        }),
+        MindReply::View(fixture.view()),
+        MindReply::Rejected(Rejection {
+            reason: RejectionReason::UnknownItem,
+        }),
+    ];
+
+    for reply in replies {
+        let decoded = round_trip_reply(reply.clone());
+        assert_eq!(decoded, reply);
+    }
+}
+
+#[test]
+fn from_impl_lifts_opening_into_request() {
+    let opening = Opening {
+        kind: Kind::Question,
+        priority: Priority::Normal,
+        title: Title::new("Choose migration order"),
+        body: Body::new("Need a decision before implementation."),
+    };
+    let request: MindRequest = opening.clone().into();
+    assert_eq!(request, MindRequest::Open(opening));
+}
+
+#[test]
+fn from_impl_lifts_view_into_reply() {
+    let view = MemoryFixture::new().view();
+    let reply: MindReply = view.clone().into();
+    assert_eq!(reply, MindReply::View(view));
+}
+
 // ─── Scope-reference variants ─────────────────────────────
 
 #[test]
 fn path_scope_round_trips() {
-    let request = OrchestrateRequest::RoleClaim(RoleClaim {
+    let request = MindRequest::RoleClaim(RoleClaim {
         role: RoleName::Designer,
         scopes: vec![ScopeReference::Path(sample_path())],
         reason: sample_reason(),
@@ -304,7 +609,7 @@ fn path_scope_round_trips() {
 
 #[test]
 fn task_scope_round_trips() {
-    let request = OrchestrateRequest::RoleClaim(RoleClaim {
+    let request = MindRequest::RoleClaim(RoleClaim {
         role: RoleName::Designer,
         scopes: vec![ScopeReference::Task(sample_task())],
         reason: sample_reason(),

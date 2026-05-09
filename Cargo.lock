@@ -255,7 +255,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "signal-persona-orchestrate"
+name = "signal-persona-mind"
 version = "0.1.0"
 dependencies = [
  "rkyv",

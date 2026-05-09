@@ -1,5 +1,5 @@
 {
-  description = "signal-persona-orchestrate — Signal contract for `orchestrate` CLI ↔ persona-orchestrate (role claim/release/handoff/observation + activity log)";
+  description = "signal-persona-mind — Signal contract for `mind` CLI ↔ persona-mind (role claim/release/handoff/observation + activity log)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -48,7 +48,7 @@
           });
         };
         devShells.default = pkgs.mkShell {
-          name = "signal-persona-orchestrate";
+          name = "signal-persona-mind";
           packages = [ pkgs.jujutsu pkgs.pkg-config toolchain ];
         };
       });
