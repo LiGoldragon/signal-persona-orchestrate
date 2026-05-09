@@ -10,10 +10,10 @@ use signal_core::{FrameBody, Reply, Request, SemaVerb};
 use signal_persona_orchestrate::{
     Activity, ActivityAcknowledgment, ActivityFilter, ActivityList, ActivityQuery,
     ActivitySubmission, ClaimAcceptance, ClaimEntry, ClaimRejection, Frame, HandoffAcceptance,
-    HandoffRejection, HandoffRejectionReason, OrchestrateReply, OrchestrateRequest, RoleClaim,
-    RoleHandoff, RoleName, RoleObservation, RoleRelease, RoleSnapshot, RoleStatus,
-    ReleaseAcknowledgment, ScopeConflict, ScopeReason, ScopeReference, TaskToken, TimestampNanos,
-    WirePath,
+    HandoffRejection, HandoffRejectionReason, OrchestrateReply, OrchestrateRequest,
+    ReleaseAcknowledgment, RoleClaim, RoleHandoff, RoleName, RoleObservation, RoleRelease,
+    RoleSnapshot, RoleStatus, ScopeConflict, ScopeReason, ScopeReference, TaskToken,
+    TimestampNanos, WirePath,
 };
 
 // ─── Helpers ──────────────────────────────────────────────

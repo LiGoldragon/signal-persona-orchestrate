@@ -34,7 +34,16 @@ use signal_core::signal_channel;
 /// coordinated schema change — every consumer of this
 /// contract recompiles together.
 #[derive(
-    Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd,
+    Archive,
+    RkyvSerialize,
+    RkyvDeserialize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
     Ord,
 )]
 pub enum RoleName {
@@ -132,7 +141,16 @@ impl AsRef<str> for ScopeReason {
 /// Nanoseconds since the UNIX epoch. Store-supplied at
 /// commit time; never agent-supplied.
 #[derive(
-    Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd,
+    Archive,
+    RkyvSerialize,
+    RkyvDeserialize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
     Ord,
 )]
 pub struct TimestampNanos(u64);
