@@ -28,6 +28,20 @@
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use signal_core::signal_channel;
 
+// ─── Error ────────────────────────────────────────────────
+
+pub type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum Error {
+    #[error("wire path must be absolute and normalized: {path}")]
+    InvalidWirePath { path: String },
+    #[error("task token must be non-empty, unbracketed, and contain no whitespace: {token}")]
+    InvalidTaskToken { token: String },
+    #[error("scope reason must be non-empty and single-line: {reason}")]
+    InvalidScopeReason { reason: String },
+}
+
 // ─── Identity ─────────────────────────────────────────────
 
 /// The closed set of workspace roles. Adding a role is a
@@ -74,12 +88,44 @@ pub enum ScopeReference {
 pub struct WirePath(String);
 
 impl WirePath {
-    pub fn new(path: impl Into<String>) -> Self {
-        Self(path.into())
+    pub fn from_absolute_path(path: impl Into<String>) -> Result<Self> {
+        let path = path.into();
+
+        if !path.starts_with('/') || path.split('/').any(|component| component == "..") {
+            return Err(Error::InvalidWirePath { path });
+        }
+
+        let components = path
+            .split('/')
+            .filter(|component| !component.is_empty() && *component != ".")
+            .collect::<Vec<_>>();
+        let normalized = if components.is_empty() {
+            "/".to_string()
+        } else {
+            format!("/{}", components.join("/"))
+        };
+
+        Ok(Self(normalized))
     }
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl TryFrom<String> for WirePath {
+    type Error = Error;
+
+    fn try_from(path: String) -> Result<Self> {
+        Self::from_absolute_path(path)
+    }
+}
+
+impl TryFrom<&str> for WirePath {
+    type Error = Error;
+
+    fn try_from(path: &str) -> Result<Self> {
+        Self::from_absolute_path(path)
     }
 }
 
@@ -96,12 +142,37 @@ impl AsRef<str> for WirePath {
 pub struct TaskToken(String);
 
 impl TaskToken {
-    pub fn new(token: impl Into<String>) -> Self {
-        Self(token.into())
+    pub fn from_wire_token(token: impl Into<String>) -> Result<Self> {
+        let token = token.into();
+        if token.is_empty()
+            || token.contains('[')
+            || token.contains(']')
+            || token.chars().any(char::is_whitespace)
+        {
+            Err(Error::InvalidTaskToken { token })
+        } else {
+            Ok(Self(token))
+        }
     }
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl TryFrom<String> for TaskToken {
+    type Error = Error;
+
+    fn try_from(token: String) -> Result<Self> {
+        Self::from_wire_token(token)
+    }
+}
+
+impl TryFrom<&str> for TaskToken {
+    type Error = Error;
+
+    fn try_from(token: &str) -> Result<Self> {
+        Self::from_wire_token(token)
     }
 }
 
@@ -121,12 +192,33 @@ impl AsRef<str> for TaskToken {
 pub struct ScopeReason(String);
 
 impl ScopeReason {
-    pub fn new(reason: impl Into<String>) -> Self {
-        Self(reason.into())
+    pub fn from_text(reason: impl Into<String>) -> Result<Self> {
+        let reason = reason.into();
+        if reason.trim().is_empty() || reason.contains('\n') || reason.contains('\r') {
+            Err(Error::InvalidScopeReason { reason })
+        } else {
+            Ok(Self(reason))
+        }
     }
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl TryFrom<String> for ScopeReason {
+    type Error = Error;
+
+    fn try_from(reason: String) -> Result<Self> {
+        Self::from_text(reason)
+    }
+}
+
+impl TryFrom<&str> for ScopeReason {
+    type Error = Error;
+
+    fn try_from(reason: &str) -> Result<Self> {
+        Self::from_text(reason)
     }
 }
 

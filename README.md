@@ -26,9 +26,11 @@ use signal_core::{FrameBody, Request};
 let request = OrchestrateRequest::RoleClaim(RoleClaim {
     role: RoleName::Designer,
     scopes: vec![
-        ScopeReference::Path(WirePath::new("/git/.../signal/ARCHITECTURE.md")),
+        ScopeReference::Path(
+            WirePath::from_absolute_path("/git/.../signal/ARCHITECTURE.md")?
+        ),
     ],
-    reason: ScopeReason::new("rescope per /91 §3.1"),
+    reason: ScopeReason::from_text("rescope per /91 §3.1")?,
 });
 let frame = Frame::new(FrameBody::Request(Request::assert(request)));
 let bytes = frame.encode_length_prefixed()?;
@@ -38,6 +40,11 @@ let bytes = frame.encode_length_prefixed()?;
 The state actor replies with `OrchestrateReply::ClaimAcceptance`
 on success or `OrchestrateReply::ClaimRejection` (carrying
 typed `ScopeConflict` records) on overlap.
+
+Use the public constructors for boundary strings before
+building a frame: `WirePath::from_absolute_path` (which
+stores a normalized absolute path),
+`TaskToken::from_wire_token`, and `ScopeReason::from_text`.
 
 ## See also
 

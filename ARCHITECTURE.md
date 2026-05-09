@@ -24,6 +24,13 @@ This contract defines its records locally (`RoleName`,
 `TimestampNanos`, etc.) because they're the channel's
 vocabulary, not records that travel beyond.
 
+Boundary strings are validated at construction time:
+`WirePath` accepts absolute paths and stores a normalized
+slash-separated form, `TaskToken` accepts raw unbracketed
+tokens with no whitespace, and `ScopeReason` accepts non-empty
+single-line text. The parser/consumer boundary should use
+these constructors before building a frame.
+
 If a future channel needs `RoleName` (a workspace-coordination
 broadcast channel, for instance), lift it to a shared
 contract or to `signal-persona`'s umbrella records. For now,
@@ -61,10 +68,10 @@ and `persona-orchestrate`.
 OrchestrateRequest::RoleClaim(RoleClaim {
     role: RoleName::Designer,
     scopes: vec![
-        ScopeReference::Path(WirePath::new("/git/.../signal/ARCHITECTURE.md")),
-        ScopeReference::Task(TaskToken::new("primary-f99")),
+        ScopeReference::Path(WirePath::from_absolute_path("/git/.../signal/ARCHITECTURE.md")?),
+        ScopeReference::Task(TaskToken::from_wire_token("primary-f99")?),
     ],
-    reason: ScopeReason::new("rescope per /91 §3.1"),
+    reason: ScopeReason::from_text("rescope per /91 §3.1")?,
 })
 
 ;; on success
@@ -77,17 +84,17 @@ OrchestrateReply::ClaimAcceptance(ClaimAcceptance {
 OrchestrateReply::ClaimRejection(ClaimRejection {
     role: RoleName::Designer,
     conflicts: vec![ScopeConflict {
-        scope: ScopeReference::Path(WirePath::new("/git/.../signal/ARCHITECTURE.md")),
+        scope: ScopeReference::Path(WirePath::from_absolute_path("/git/.../signal/ARCHITECTURE.md")?),
         held_by: RoleName::Operator,
-        held_reason: ScopeReason::new("Persona-prefix sweep"),
+        held_reason: ScopeReason::from_text("Persona-prefix sweep")?,
     }],
 })
 
 ;; agent files an activity entry
 OrchestrateRequest::ActivitySubmission(ActivitySubmission {
     role: RoleName::Operator,
-    scope: ScopeReference::Path(WirePath::new("/git/.../persona-router/src/router.rs")),
-    reason: ScopeReason::new("RouterActor consumes signal-persona-system Frame"),
+    scope: ScopeReference::Path(WirePath::from_absolute_path("/git/.../persona-router/src/router.rs")?),
+    reason: ScopeReason::from_text("RouterActor consumes signal-persona-system Frame")?,
 })
 
 ;; reply
