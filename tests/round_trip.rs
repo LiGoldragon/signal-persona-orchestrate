@@ -77,10 +77,10 @@ struct MemoryFixture {
 impl MemoryFixture {
     fn new() -> Self {
         Self {
-            item_id: StableItemId::new("item-0000000000000001"),
-            display_id: DisplayId::new("9iv"),
+            item_id: StableItemId::new("aab"),
+            display_id: DisplayId::new("aab"),
             actor: ActorName::new("operator"),
-            operation: OperationId::new("op-0000000000000001"),
+            operation: OperationId::new("aab"),
         }
     }
 
@@ -96,7 +96,7 @@ impl MemoryFixture {
         Item {
             id: self.item_id.clone(),
             display_id: self.display_id.clone(),
-            aliases: vec![ExternalAlias::new("primary-9iv")],
+            aliases: vec![ExternalAlias::new("primary-aab")],
             kind: ItemKind::Task,
             status: ItemStatus::Open,
             priority: ItemPriority::High,
@@ -131,7 +131,7 @@ impl MemoryFixture {
     fn edge(&self) -> Edge {
         Edge {
             event: EventSeq::new(3),
-            source: StableItemId::new("item-0000000000000002"),
+            source: StableItemId::new("aac"),
             kind: EdgeKind::DependsOn,
             target: EdgeTarget::Item(self.item_id.clone()),
             body: Some(TextBody::new("Implementation waits on the contract.")),
@@ -158,7 +158,7 @@ impl MemoryFixture {
         AliasAddedEvent {
             header: self.header(5),
             item: self.item_id.clone(),
-            alias: ExternalAlias::new("primary-9iv"),
+            alias: ExternalAlias::new("primary-aab"),
         }
     }
 
@@ -336,7 +336,7 @@ fn open_request_round_trips_through_length_prefixed_frame() {
 #[test]
 fn add_note_request_round_trips() {
     let request = MindRequest::NoteSubmission(NoteSubmission {
-        item: ItemReference::Display(DisplayId::new("9iv")),
+        item: ItemReference::Display(DisplayId::new("aab")),
         body: TextBody::new("Append-only note."),
     });
     let decoded = round_trip_request(request.clone());
@@ -348,7 +348,7 @@ fn link_request_round_trips_with_typed_edge_kind() {
     let request = MindRequest::Link(Link {
         source: ItemReference::Display(DisplayId::new("abc")),
         kind: EdgeKind::DependsOn,
-        target: LinkTarget::Item(ItemReference::Display(DisplayId::new("9iv"))),
+        target: LinkTarget::Item(ItemReference::Display(DisplayId::new("aab"))),
         body: None,
     });
     let decoded = round_trip_request(request.clone());
@@ -358,7 +358,7 @@ fn link_request_round_trips_with_typed_edge_kind() {
 #[test]
 fn link_request_round_trips_with_external_report_reference() {
     let request = MindRequest::Link(Link {
-        source: ItemReference::Display(DisplayId::new("9iv")),
+        source: ItemReference::Display(DisplayId::new("aab")),
         kind: EdgeKind::References,
         target: LinkTarget::External(ExternalReference::Report(ReportPath::new(
             "reports/operator/100-persona-mind-central-rename-plan.md",
@@ -372,7 +372,7 @@ fn link_request_round_trips_with_external_report_reference() {
 #[test]
 fn status_change_request_round_trips() {
     let request = MindRequest::StatusChange(StatusChange {
-        item: ItemReference::Alias(ExternalAlias::new("primary-9iv")),
+        item: ItemReference::Alias(ExternalAlias::new("primary-aab")),
         status: ItemStatus::InProgress,
         body: Some(TextBody::new("Operator started it.")),
     });
@@ -383,8 +383,8 @@ fn status_change_request_round_trips() {
 #[test]
 fn add_alias_request_round_trips() {
     let request = MindRequest::AliasAssignment(AliasAssignment {
-        item: ItemReference::Stable(StableItemId::new("item-0000000000000001")),
-        alias: ExternalAlias::new("primary-9iv"),
+        item: ItemReference::Stable(StableItemId::new("aab")),
+        alias: ExternalAlias::new("primary-aab"),
     });
     let decoded = round_trip_request(request.clone());
     assert_eq!(decoded, request);
@@ -401,7 +401,7 @@ fn every_query_kind_round_trips() {
         QueryKind::ByItem(ItemReference::Stable(fixture.item_id.clone())),
         QueryKind::ByKind(ItemKind::Decision),
         QueryKind::ByStatus(ItemStatus::Closed),
-        QueryKind::ByAlias(ExternalAlias::new("primary-9iv")),
+        QueryKind::ByAlias(ExternalAlias::new("primary-aab")),
     ];
 
     for kind in kinds {
@@ -427,7 +427,7 @@ fn every_edge_kind_round_trips_as_a_link_request() {
 
     for kind in kinds {
         fixture.assert_request_round_trips(MindRequest::Link(Link {
-            source: ItemReference::Stable(StableItemId::new("item-0000000000000002")),
+            source: ItemReference::Stable(StableItemId::new("aac")),
             kind,
             target: LinkTarget::Item(ItemReference::Stable(fixture.item_id.clone())),
             body: None,
@@ -441,7 +441,7 @@ fn every_external_reference_variant_round_trips_as_a_link_target() {
     let targets = vec![
         ExternalReference::Report(ReportPath::new("reports/operator/100-mind.md")),
         ExternalReference::GitCommit(CommitHash::new("7f0bf022")),
-        ExternalReference::BeadsTask(BeadsToken::new("primary-9iv")),
+        ExternalReference::BeadsTask(BeadsToken::new("primary-aab")),
         ExternalReference::File(ReferencePath::new(
             "/git/github.com/LiGoldragon/persona-mind/src/lib.rs",
         )),
