@@ -10,14 +10,14 @@ use signal_core::{FrameBody, Reply, Request, SemaVerb};
 use signal_persona_mind::{
     Activity, ActivityAcknowledgment, ActivityFilter, ActivityList, ActivityQuery,
     ActivitySubmission, ActorName, AliasAddedEvent, AliasAssignment, AliasReceipt, BeadsToken,
-    Body, ClaimAcceptance, ClaimEntry, ClaimRejection, CommitHash, DisplayId, Edge, EdgeAddedEvent,
+    TextBody, ClaimAcceptance, ClaimEntry, ClaimRejection, CommitHash, DisplayId, Edge, EdgeAddedEvent,
     EdgeKind, EdgeTarget, Event, EventHeader, EventSeq, ExternalAlias, ExternalReference, Frame,
     HandoffAcceptance, HandoffRejection, HandoffRejectionReason, Item, ItemOpenedEvent,
-    ItemReference, Kind, Link, LinkReceipt, LinkTarget, MindReply, MindRequest, Note,
-    NoteAddedEvent, NoteReceipt, NoteSubmission, Opening, OpeningReceipt, OperationId, Priority,
+    ItemReference, ItemKind, Link, LinkReceipt, LinkTarget, MindReply, MindRequest, Note,
+    NoteAddedEvent, NoteReceipt, NoteSubmission, Opening, OpeningReceipt, OperationId, ItemPriority,
     Query, QueryKind, QueryLimit, ReferencePath, Rejection, RejectionReason, ReleaseAcknowledgment,
     ReportPath, RoleClaim, RoleHandoff, RoleName, RoleObservation, RoleRelease, RoleSnapshot,
-    RoleStatus, ScopeConflict, ScopeReason, ScopeReference, StableItemId, Status, StatusChange,
+    RoleStatus, ScopeConflict, ScopeReason, ScopeReference, StableItemId, ItemStatus, StatusChange,
     StatusChangedEvent, StatusReceipt, TaskToken, TimestampNanos, Title, View, WirePath,
 };
 
@@ -97,11 +97,11 @@ impl MemoryFixture {
             id: self.item_id.clone(),
             display_id: self.display_id.clone(),
             aliases: vec![ExternalAlias::new("primary-9iv")],
-            kind: Kind::Task,
-            status: Status::Open,
-            priority: Priority::High,
+            kind: ItemKind::Task,
+            status: ItemStatus::Open,
+            priority: ItemPriority::High,
             title: Title::new("Implement native mind memory graph"),
-            body: Body::new("Replace BEADS with typed Persona mind records."),
+            body: TextBody::new("Replace BEADS with typed Persona mind records."),
         }
     }
 
@@ -117,7 +117,7 @@ impl MemoryFixture {
             event: EventSeq::new(2),
             item: self.item_id.clone(),
             author: self.actor.clone(),
-            body: Body::new("First implementation slice is the contract repo."),
+            body: TextBody::new("First implementation slice is the contract repo."),
         }
     }
 
@@ -134,7 +134,7 @@ impl MemoryFixture {
             source: StableItemId::new("item-0000000000000002"),
             kind: EdgeKind::DependsOn,
             target: EdgeTarget::Item(self.item_id.clone()),
-            body: Some(Body::new("Implementation waits on the contract.")),
+            body: Some(TextBody::new("Implementation waits on the contract.")),
         }
     }
 
@@ -149,8 +149,8 @@ impl MemoryFixture {
         StatusChangedEvent {
             header: self.header(4),
             item: self.item_id.clone(),
-            status: Status::Closed,
-            body: Some(Body::new("Contract shipped.")),
+            status: ItemStatus::Closed,
+            body: Some(TextBody::new("Contract shipped.")),
         }
     }
 
@@ -282,10 +282,10 @@ fn activity_query_with_task_filter_round_trips() {
 #[test]
 fn open_request_round_trips_through_length_prefixed_frame() {
     let request = MindRequest::Opening(Opening {
-        kind: Kind::Task,
-        priority: Priority::High,
+        kind: ItemKind::Task,
+        priority: ItemPriority::High,
         title: Title::new("Replace BEADS"),
-        body: Body::new("Open a typed mind item."),
+        body: TextBody::new("Open a typed mind item."),
     });
     let decoded = round_trip_request(request.clone());
     assert_eq!(decoded, request);
@@ -295,7 +295,7 @@ fn open_request_round_trips_through_length_prefixed_frame() {
 fn add_note_request_round_trips() {
     let request = MindRequest::NoteSubmission(NoteSubmission {
         item: ItemReference::Display(DisplayId::new("9iv")),
-        body: Body::new("Append-only note."),
+        body: TextBody::new("Append-only note."),
     });
     let decoded = round_trip_request(request.clone());
     assert_eq!(decoded, request);
@@ -321,7 +321,7 @@ fn link_request_round_trips_with_external_report_reference() {
         target: LinkTarget::External(ExternalReference::Report(ReportPath::new(
             "reports/operator/100-persona-mind-central-rename-plan.md",
         ))),
-        body: Some(Body::new("Research basis for this work item.")),
+        body: Some(TextBody::new("Research basis for this work item.")),
     });
     let decoded = round_trip_request(request.clone());
     assert_eq!(decoded, request);
@@ -331,8 +331,8 @@ fn link_request_round_trips_with_external_report_reference() {
 fn status_change_request_round_trips() {
     let request = MindRequest::StatusChange(StatusChange {
         item: ItemReference::Alias(ExternalAlias::new("primary-9iv")),
-        status: Status::InProgress,
-        body: Some(Body::new("Operator started it.")),
+        status: ItemStatus::InProgress,
+        body: Some(TextBody::new("Operator started it.")),
     });
     let decoded = round_trip_request(request.clone());
     assert_eq!(decoded, request);
@@ -357,8 +357,8 @@ fn every_query_kind_round_trips() {
         QueryKind::Open,
         QueryKind::RecentEvents,
         QueryKind::ByItem(ItemReference::Stable(fixture.item_id.clone())),
-        QueryKind::ByKind(Kind::Decision),
-        QueryKind::ByStatus(Status::Closed),
+        QueryKind::ByKind(ItemKind::Decision),
+        QueryKind::ByStatus(ItemStatus::Closed),
         QueryKind::ByAlias(ExternalAlias::new("primary-9iv")),
     ];
 
@@ -410,7 +410,7 @@ fn every_external_reference_variant_round_trips_as_a_link_target() {
             source: ItemReference::Stable(fixture.item_id.clone()),
             kind: EdgeKind::References,
             target: LinkTarget::External(target),
-            body: Some(Body::new("typed external reference")),
+            body: Some(TextBody::new("typed external reference")),
         }));
     }
 }
@@ -578,10 +578,10 @@ fn memory_receipt_replies_round_trip() {
 #[test]
 fn from_impl_lifts_opening_into_request() {
     let opening = Opening {
-        kind: Kind::Question,
-        priority: Priority::Normal,
+        kind: ItemKind::Question,
+        priority: ItemPriority::Normal,
         title: Title::new("Choose migration order"),
-        body: Body::new("Need a decision before implementation."),
+        body: TextBody::new("Need a decision before implementation."),
     };
     let request: MindRequest = opening.clone().into();
     assert_eq!(request, MindRequest::Opening(opening));

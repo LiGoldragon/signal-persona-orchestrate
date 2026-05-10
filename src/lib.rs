@@ -545,9 +545,9 @@ impl Title {
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
-pub struct Body(String);
+pub struct TextBody(String);
 
-impl Body {
+impl TextBody {
     pub fn new(value: impl Into<String>) -> Self {
         Self(value.into())
     }
@@ -599,7 +599,7 @@ impl CommitHash {
 // ─── Mind Memory Domain ───────────────────────────────────
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Kind {
+pub enum ItemKind {
     Task,
     Defect,
     Question,
@@ -609,7 +609,7 @@ pub enum Kind {
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Status {
+pub enum ItemStatus {
     Open,
     InProgress,
     Blocked,
@@ -618,7 +618,7 @@ pub enum Status {
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Priority {
+pub enum ItemPriority {
     Critical,
     High,
     Normal,
@@ -668,16 +668,16 @@ pub enum EdgeTarget {
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Opening {
-    pub kind: Kind,
-    pub priority: Priority,
+    pub kind: ItemKind,
+    pub priority: ItemPriority,
     pub title: Title,
-    pub body: Body,
+    pub body: TextBody,
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct NoteSubmission {
     pub item: ItemReference,
-    pub body: Body,
+    pub body: TextBody,
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
@@ -685,14 +685,14 @@ pub struct Link {
     pub source: ItemReference,
     pub kind: EdgeKind,
     pub target: LinkTarget,
-    pub body: Option<Body>,
+    pub body: Option<TextBody>,
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct StatusChange {
     pub item: ItemReference,
-    pub status: Status,
-    pub body: Option<Body>,
+    pub status: ItemStatus,
+    pub body: Option<TextBody>,
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
@@ -714,8 +714,8 @@ pub enum QueryKind {
     Open,
     RecentEvents,
     ByItem(ItemReference),
-    ByKind(Kind),
-    ByStatus(Status),
+    ByKind(ItemKind),
+    ByStatus(ItemStatus),
     ByAlias(ExternalAlias),
 }
 
@@ -726,11 +726,11 @@ pub struct Item {
     pub id: StableItemId,
     pub display_id: DisplayId,
     pub aliases: Vec<ExternalAlias>,
-    pub kind: Kind,
-    pub status: Status,
-    pub priority: Priority,
+    pub kind: ItemKind,
+    pub status: ItemStatus,
+    pub priority: ItemPriority,
     pub title: Title,
-    pub body: Body,
+    pub body: TextBody,
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
@@ -738,7 +738,7 @@ pub struct Note {
     pub event: EventSeq,
     pub item: StableItemId,
     pub author: ActorName,
-    pub body: Body,
+    pub body: TextBody,
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
@@ -747,7 +747,7 @@ pub struct Edge {
     pub source: StableItemId,
     pub kind: EdgeKind,
     pub target: EdgeTarget,
-    pub body: Option<Body>,
+    pub body: Option<TextBody>,
 }
 
 // ─── Mind Memory Events ───────────────────────────────────
@@ -781,8 +781,8 @@ pub struct EdgeAddedEvent {
 pub struct StatusChangedEvent {
     pub header: EventHeader,
     pub item: StableItemId,
-    pub status: Status,
-    pub body: Option<Body>,
+    pub status: ItemStatus,
+    pub body: Option<TextBody>,
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
