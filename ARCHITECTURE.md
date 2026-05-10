@@ -135,7 +135,7 @@ The contract validates boundary strings before they become wire values.
 
 | Type | Invariant |
 |---|---|
-| `RoleName` | closed role set: operator, operator-assistant, designer, designer-assistant, system-specialist, poet, poet-assistant. |
+| `RoleName` | closed role set: operator, operator-assistant, designer, designer-assistant, system-specialist, system-assistant, poet, poet-assistant. |
 | `WirePath` | absolute normalized slash-separated path; rejects `..`. |
 | `TaskToken` | raw unbracketed token, non-empty, no whitespace or brackets. |
 | `ScopeReason` | non-empty single-line text. |

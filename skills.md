@@ -26,8 +26,8 @@ If your change adds a new request or reply variant, edit
 ## What this repo owns
 
 - `RoleName` (closed enum: Operator, OperatorAssistant,
-  Designer, DesignerAssistant, SystemSpecialist, Poet,
-  PoetAssistant).
+  Designer, DesignerAssistant, SystemSpecialist,
+  SystemAssistant, Poet, PoetAssistant).
 - `ScopeReference` (closed enum: Path | Task) plus
   `WirePath` and `TaskToken` newtypes.
 - `ScopeReason` (provisional `String` newtype).

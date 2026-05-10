@@ -67,6 +67,7 @@ pub enum RoleName {
     Designer,
     DesignerAssistant,
     SystemSpecialist,
+    SystemAssistant,
     Poet,
     PoetAssistant,
 }

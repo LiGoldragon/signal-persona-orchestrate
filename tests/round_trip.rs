@@ -204,6 +204,7 @@ fn role_name_covers_workspace_coordination_roles() {
         RoleName::Designer,
         RoleName::DesignerAssistant,
         RoleName::SystemSpecialist,
+        RoleName::SystemAssistant,
         RoleName::Poet,
         RoleName::PoetAssistant,
     ];
