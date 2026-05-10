@@ -281,7 +281,7 @@ fn activity_query_with_task_filter_round_trips() {
 
 #[test]
 fn open_request_round_trips_through_length_prefixed_frame() {
-    let request = MindRequest::Open(Opening {
+    let request = MindRequest::Opening(Opening {
         kind: Kind::Task,
         priority: Priority::High,
         title: Title::new("Replace BEADS"),
@@ -293,7 +293,7 @@ fn open_request_round_trips_through_length_prefixed_frame() {
 
 #[test]
 fn add_note_request_round_trips() {
-    let request = MindRequest::AddNote(NoteSubmission {
+    let request = MindRequest::NoteSubmission(NoteSubmission {
         item: ItemReference::Display(DisplayId::new("9iv")),
         body: Body::new("Append-only note."),
     });
@@ -329,7 +329,7 @@ fn link_request_round_trips_with_external_report_reference() {
 
 #[test]
 fn status_change_request_round_trips() {
-    let request = MindRequest::ChangeStatus(StatusChange {
+    let request = MindRequest::StatusChange(StatusChange {
         item: ItemReference::Alias(ExternalAlias::new("primary-9iv")),
         status: Status::InProgress,
         body: Some(Body::new("Operator started it.")),
@@ -340,7 +340,7 @@ fn status_change_request_round_trips() {
 
 #[test]
 fn add_alias_request_round_trips() {
-    let request = MindRequest::AddAlias(AliasAssignment {
+    let request = MindRequest::AliasAssignment(AliasAssignment {
         item: ItemReference::Stable(StableItemId::new("item-0000000000000001")),
         alias: ExternalAlias::new("primary-9iv"),
     });
@@ -548,23 +548,23 @@ fn activity_list_round_trips() {
 fn memory_receipt_replies_round_trip() {
     let fixture = MemoryFixture::new();
     let replies = vec![
-        MindReply::Opened(OpeningReceipt {
+        MindReply::OpeningReceipt(OpeningReceipt {
             event: fixture.opened_event(),
         }),
-        MindReply::NoteAdded(NoteReceipt {
+        MindReply::NoteReceipt(NoteReceipt {
             event: fixture.note_event(),
         }),
-        MindReply::Linked(LinkReceipt {
+        MindReply::LinkReceipt(LinkReceipt {
             event: fixture.edge_event(),
         }),
-        MindReply::StatusChanged(StatusReceipt {
+        MindReply::StatusReceipt(StatusReceipt {
             event: fixture.status_event(),
         }),
-        MindReply::AliasAdded(AliasReceipt {
+        MindReply::AliasReceipt(AliasReceipt {
             event: fixture.alias_event(),
         }),
         MindReply::View(fixture.view()),
-        MindReply::Rejected(Rejection {
+        MindReply::Rejection(Rejection {
             reason: RejectionReason::UnknownItem,
         }),
     ];
@@ -584,7 +584,7 @@ fn from_impl_lifts_opening_into_request() {
         body: Body::new("Need a decision before implementation."),
     };
     let request: MindRequest = opening.clone().into();
-    assert_eq!(request, MindRequest::Open(opening));
+    assert_eq!(request, MindRequest::Opening(opening));
 }
 
 #[test]

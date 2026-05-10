@@ -12,7 +12,7 @@ defines the typed request/reply channel used by the `mind` CLI,
 
 This repo owns records, validation newtypes, rkyv round trips, and channel
 shape. It does not own the CLI binary, actors, database, storage tables,
-transport lifecycle, or compatibility lock-file projection.
+transport lifecycle, or lock-file migration.
 
 ```mermaid
 flowchart LR
@@ -99,7 +99,9 @@ operations are schema changes coordinated through this contract.
 | `RoleObservation` | `RoleSnapshot` |
 
 These records replace the lock-file claim/release/handoff protocol. Lock files
-may exist only as transitional local projections outside this contract.
+are outside this contract and outside the `persona-mind` implementation target.
+They belong only to the temporary workspace workflow until agents switch to
+`mind`.
 
 ### 3.2 Activity
 
@@ -212,10 +214,10 @@ This repo does not own:
 - Kameo actors;
 - `mind.redb`;
 - daemon lifecycle and local socket path;
-- `persona-sema` / `sema` table declarations;
+- `sema` table declarations;
 - caller identity resolution policy;
 - time/ID minting policy;
-- lock-file projection format;
+- lock-file migration workflow;
 - BEADS import code.
 
 ## Code Map
