@@ -68,6 +68,7 @@ pub enum RoleName {
     DesignerAssistant,
     SystemSpecialist,
     Poet,
+    PoetAssistant,
 }
 
 // ─── Scope reference ──────────────────────────────────────

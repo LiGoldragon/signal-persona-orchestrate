@@ -8,7 +8,8 @@
 
 `signal-persona-mind` is the public vocabulary for Persona's central mind. It
 defines the typed request/reply channel used by the `mind` CLI,
-`tools/orchestrate` compatibility shim, and long-lived `persona-mind` daemon.
+external `tools/orchestrate` cutover wrappers, and long-lived `persona-mind`
+daemon.
 
 This repo owns records, validation newtypes, rkyv round trips, and channel
 shape. It does not own the CLI binary, actors, database, storage tables,
@@ -57,11 +58,11 @@ signal_channel! {
         RoleObservation(RoleObservation),
         ActivitySubmission(ActivitySubmission),
         ActivityQuery(ActivityQuery),
-        Open(Opening),
-        AddNote(NoteSubmission),
+        Opening(Opening),
+        NoteSubmission(NoteSubmission),
         Link(Link),
-        ChangeStatus(StatusChange),
-        AddAlias(AliasAssignment),
+        StatusChange(StatusChange),
+        AliasAssignment(AliasAssignment),
         Query(Query),
     }
     reply MindReply {
@@ -73,13 +74,13 @@ signal_channel! {
         RoleSnapshot(RoleSnapshot),
         ActivityAcknowledgment(ActivityAcknowledgment),
         ActivityList(ActivityList),
-        Opened(OpeningReceipt),
-        NoteAdded(NoteReceipt),
-        Linked(LinkReceipt),
-        StatusChanged(StatusReceipt),
-        AliasAdded(AliasReceipt),
+        OpeningReceipt(OpeningReceipt),
+        NoteReceipt(NoteReceipt),
+        LinkReceipt(LinkReceipt),
+        StatusReceipt(StatusReceipt),
+        AliasReceipt(AliasReceipt),
         View(View),
-        Rejected(Rejection),
+        Rejection(Rejection),
     }
 }
 ```
@@ -117,11 +118,11 @@ Activity time is store-supplied. `ActivitySubmission` does not carry
 
 | Request | Reply |
 |---|---|
-| `Open` | `Opened` |
-| `AddNote` | `NoteAdded` |
-| `Link` | `Linked` |
-| `ChangeStatus` | `StatusChanged` |
-| `AddAlias` | `AliasAdded` |
+| `Opening` | `OpeningReceipt` |
+| `NoteSubmission` | `NoteReceipt` |
+| `Link` | `LinkReceipt` |
+| `StatusChange` | `StatusReceipt` |
+| `AliasAssignment` | `AliasReceipt` |
 | `Query` | `View` |
 
 These records are the active native replacement for BEADS as a work/memory
@@ -134,7 +135,7 @@ The contract validates boundary strings before they become wire values.
 
 | Type | Invariant |
 |---|---|
-| `RoleName` | closed role set: operator, operator-assistant, designer, designer-assistant, system-specialist, poet. |
+| `RoleName` | closed role set: operator, operator-assistant, designer, designer-assistant, system-specialist, poet, poet-assistant. |
 | `WirePath` | absolute normalized slash-separated path; rejects `..`. |
 | `TaskToken` | raw unbracketed token, non-empty, no whitespace or brackets. |
 | `ScopeReason` | non-empty single-line text. |
@@ -169,7 +170,7 @@ Illustrative command shapes:
 ```text
 (RoleClaim Operator ((Path "/git/github.com/LiGoldragon/persona-mind")) "implement command-line mind")
 (Query Ready 20)
-(Open Task High "wire command-line mind" "replace lock helper with typed state")
+(Opening Task High "wire command-line mind" "replace lock helper with typed state")
 ```
 
 The exact spelling is a projection decision. The invariant is that the parsed
@@ -184,7 +185,26 @@ consumers.
 Backward compatibility is handled by explicit conversion code, not by weak
 catch-all records.
 
-## 7 · Tests
+## 7 · Constraints
+
+- The channel is one closed `MindRequest` enum and one closed `MindReply`
+  enum emitted by `signal_channel!`.
+- The architecture's channel declaration matches the implemented
+  `signal_channel!` invocation in `src/lib.rs`.
+- `RoleName` covers every workspace coordination role in
+  `~/primary/protocols/orchestration.md`.
+- Request payloads do not mint `ActorName`, `TimestampNanos`, `EventSeq`,
+  `OperationId`, stable item IDs, or display IDs.
+- Activity time is store-supplied; `ActivitySubmission` does not carry
+  `TimestampNanos`.
+- Lock files and BEADS are represented only as temporary external references or
+  aliases, never as live backend protocol.
+- This contract crate contains no CLI, daemon, actor runtime, database table,
+  transport, or migration implementation.
+- The text surface is NOTA projected into these exact records; there is no
+  second command language.
+
+## 8 · Tests
 
 Existing tests in `tests/round_trip.rs` cover:
 
@@ -196,6 +216,7 @@ Existing tests in `tests/round_trip.rs` cover:
 - scope variants;
 - external references;
 - boundary validation.
+- workspace role coverage.
 
 Missing tests for the next wave:
 
@@ -205,8 +226,9 @@ Missing tests for the next wave:
 | `nota_projection_rejects_cli_only_command` | no second command language. |
 | `request_payload_cannot_carry_timestamp` | store mints time. |
 | `request_payload_cannot_carry_event_sequence` | store mints sequence. |
+| `contract_crate_cannot_spawn_actor_runtime` | contract crate stays behavior-free. |
 
-## 8 · Non-ownership
+## 9 · Non-ownership
 
 This repo does not own:
 

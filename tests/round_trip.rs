@@ -10,15 +10,15 @@ use signal_core::{FrameBody, Reply, Request, SemaVerb};
 use signal_persona_mind::{
     Activity, ActivityAcknowledgment, ActivityFilter, ActivityList, ActivityQuery,
     ActivitySubmission, ActorName, AliasAddedEvent, AliasAssignment, AliasReceipt, BeadsToken,
-    TextBody, ClaimAcceptance, ClaimEntry, ClaimRejection, CommitHash, DisplayId, Edge, EdgeAddedEvent,
+    ClaimAcceptance, ClaimEntry, ClaimRejection, CommitHash, DisplayId, Edge, EdgeAddedEvent,
     EdgeKind, EdgeTarget, Event, EventHeader, EventSeq, ExternalAlias, ExternalReference, Frame,
-    HandoffAcceptance, HandoffRejection, HandoffRejectionReason, Item, ItemOpenedEvent,
-    ItemReference, ItemKind, Link, LinkReceipt, LinkTarget, MindReply, MindRequest, Note,
-    NoteAddedEvent, NoteReceipt, NoteSubmission, Opening, OpeningReceipt, OperationId, ItemPriority,
-    Query, QueryKind, QueryLimit, ReferencePath, Rejection, RejectionReason, ReleaseAcknowledgment,
+    HandoffAcceptance, HandoffRejection, HandoffRejectionReason, Item, ItemKind, ItemOpenedEvent,
+    ItemPriority, ItemReference, ItemStatus, Link, LinkReceipt, LinkTarget, MindReply, MindRequest,
+    Note, NoteAddedEvent, NoteReceipt, NoteSubmission, Opening, OpeningReceipt, OperationId, Query,
+    QueryKind, QueryLimit, ReferencePath, Rejection, RejectionReason, ReleaseAcknowledgment,
     ReportPath, RoleClaim, RoleHandoff, RoleName, RoleObservation, RoleRelease, RoleSnapshot,
-    RoleStatus, ScopeConflict, ScopeReason, ScopeReference, StableItemId, ItemStatus, StatusChange,
-    StatusChangedEvent, StatusReceipt, TaskToken, TimestampNanos, Title, View, WirePath,
+    RoleStatus, ScopeConflict, ScopeReason, ScopeReference, StableItemId, StatusChange,
+    StatusChangedEvent, StatusReceipt, TaskToken, TextBody, TimestampNanos, Title, View, WirePath,
 };
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -194,6 +194,29 @@ fn role_claim_with_paths_round_trips() {
     });
     let decoded = round_trip_request(request.clone());
     assert_eq!(decoded, request);
+}
+
+#[test]
+fn role_name_covers_workspace_coordination_roles() {
+    let roles = [
+        RoleName::Operator,
+        RoleName::OperatorAssistant,
+        RoleName::Designer,
+        RoleName::DesignerAssistant,
+        RoleName::SystemSpecialist,
+        RoleName::Poet,
+        RoleName::PoetAssistant,
+    ];
+
+    for role in roles {
+        let request = MindRequest::RoleClaim(RoleClaim {
+            role,
+            scopes: vec![sample_path_scope()],
+            reason: sample_reason(),
+        });
+        let decoded = round_trip_request(request.clone());
+        assert_eq!(decoded, request);
+    }
 }
 
 #[test]

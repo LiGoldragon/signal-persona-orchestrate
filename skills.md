@@ -26,21 +26,23 @@ If your change adds a new request or reply variant, edit
 ## What this repo owns
 
 - `RoleName` (closed enum: Operator, OperatorAssistant,
-  Designer, DesignerAssistant, SystemSpecialist, Poet).
+  Designer, DesignerAssistant, SystemSpecialist, Poet,
+  PoetAssistant).
 - `ScopeReference` (closed enum: Path | Task) plus
   `WirePath` and `TaskToken` newtypes.
 - `ScopeReason` (provisional `String` newtype).
 - `TimestampNanos` (store-supplied; never agent-supplied).
 - The closed `MindRequest` enum (`RoleClaim`,
   `RoleRelease`, `RoleHandoff`, `RoleObservation`,
-  `ActivitySubmission`, `ActivityQuery`, `Open`,
-  `AddNote`, `Link`, `ChangeStatus`, `AddAlias`, `Query`).
+  `ActivitySubmission`, `ActivityQuery`, `Opening`,
+  `NoteSubmission`, `Link`, `StatusChange`,
+  `AliasAssignment`, `Query`).
 - The closed `MindReply` enum (`ClaimAcceptance`,
   `ClaimRejection`, `ReleaseAcknowledgment`,
   `HandoffAcceptance`, `HandoffRejection`, `RoleSnapshot`,
-  `ActivityAcknowledgment`, `ActivityList`, `Opened`,
-  `NoteAdded`, `Linked`, `StatusChanged`, `AliasAdded`,
-  `View`, `Rejected`).
+  `ActivityAcknowledgment`, `ActivityList`,
+  `OpeningReceipt`, `NoteReceipt`, `LinkReceipt`,
+  `StatusReceipt`, `AliasReceipt`, `View`, `Rejection`).
 - The mind memory/work record vocabulary: `Item`, `Note`, `Edge`,
   `Event`, aliases, references, and ready-query records.
 - The `Frame` type alias and round-trip tests.
@@ -51,8 +53,9 @@ If your change adds a new request or reply variant, edit
   `persona-mind`.
 - The CLI binary parsing — that's the `orchestrate` bin
   compatibility shim and the `mind` bin target inside `persona-mind`.
-- Lock-file projection writing — that's
-  `persona-mind`.
+- Lock-file projection writing — outside this implementation
+  target; `persona-mind` replaces lock files instead of
+  projecting them.
 - The activity log retention policy — that's
   `persona-mind`.
 - Storage tables — those live in `persona-mind`'s
