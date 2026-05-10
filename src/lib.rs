@@ -63,10 +63,11 @@ pub enum Error {
 )]
 pub enum RoleName {
     Operator,
+    OperatorAssistant,
     Designer,
+    DesignerAssistant,
     SystemSpecialist,
     Poet,
-    Assistant,
 }
 
 // ─── Scope reference ──────────────────────────────────────

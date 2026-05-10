@@ -22,6 +22,9 @@ This contract defines its records locally (`RoleName`,
 `ScopeReference`, `WirePath`, `TaskToken`, `ScopeReason`,
 `TimestampNanos`, item identifiers, notes, edges, events, etc.) because
 they're the mind channel's vocabulary, not records that travel beyond.
+`RoleName` matches the current six orchestration roles:
+operator, operator-assistant, designer, designer-assistant,
+system-specialist, and poet.
 
 Boundary strings are validated at construction time:
 `WirePath` accepts absolute paths and stores a normalized

@@ -227,7 +227,7 @@ fn role_observation_round_trips() {
 #[test]
 fn activity_submission_round_trips() {
     let request = MindRequest::ActivitySubmission(ActivitySubmission {
-        role: RoleName::Assistant,
+        role: RoleName::OperatorAssistant,
         scope: sample_path_scope(),
         reason: ScopeReason::from_text("audit signal-persona-system integration")
             .expect("scope reason"),
@@ -480,7 +480,7 @@ fn handoff_rejection_target_conflict_round_trips() {
         to: RoleName::Operator,
         reason: HandoffRejectionReason::TargetRoleConflict(vec![ScopeConflict {
             scope: sample_path_scope(),
-            held_by: RoleName::Assistant,
+            held_by: RoleName::DesignerAssistant,
             held_reason: ScopeReason::from_text("audit pass").expect("scope reason"),
         }]),
     });
