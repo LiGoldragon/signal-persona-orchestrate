@@ -198,18 +198,7 @@ fn role_claim_with_paths_round_trips() {
 
 #[test]
 fn role_name_covers_workspace_coordination_roles() {
-    let roles = [
-        RoleName::Operator,
-        RoleName::OperatorAssistant,
-        RoleName::Designer,
-        RoleName::DesignerAssistant,
-        RoleName::SystemSpecialist,
-        RoleName::SystemAssistant,
-        RoleName::Poet,
-        RoleName::PoetAssistant,
-    ];
-
-    for role in roles {
+    for role in RoleName::ALL {
         let request = MindRequest::RoleClaim(RoleClaim {
             role,
             scopes: vec![sample_path_scope()],
@@ -218,6 +207,35 @@ fn role_name_covers_workspace_coordination_roles() {
         let decoded = round_trip_request(request.clone());
         assert_eq!(decoded, request);
     }
+}
+
+#[test]
+fn role_name_parses_workspace_coordination_tokens() {
+    let cases = [
+        ("operator", RoleName::Operator),
+        ("operator-assistant", RoleName::OperatorAssistant),
+        ("designer", RoleName::Designer),
+        ("designer-assistant", RoleName::DesignerAssistant),
+        ("system-specialist", RoleName::SystemSpecialist),
+        ("system-assistant", RoleName::SystemAssistant),
+        ("poet", RoleName::Poet),
+        ("poet-assistant", RoleName::PoetAssistant),
+    ];
+
+    for (token, role) in cases {
+        assert_eq!(RoleName::from_wire_token(token), Ok(role));
+        assert_eq!(token.parse::<RoleName>(), Ok(role));
+        assert_eq!(role.as_wire_token(), token);
+        assert_eq!(role.to_string(), token);
+    }
+}
+
+#[test]
+fn role_name_rejects_unregistered_workspace_roles() {
+    assert!(RoleName::from_wire_token("").is_err());
+    assert!(RoleName::from_wire_token("operator assistant").is_err());
+    assert!(RoleName::from_wire_token("Operator").is_err());
+    assert!(RoleName::from_wire_token("critic").is_err());
 }
 
 #[test]

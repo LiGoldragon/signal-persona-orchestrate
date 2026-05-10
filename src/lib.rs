@@ -28,6 +28,8 @@
 
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use signal_core::signal_channel;
+use std::fmt;
+use std::str::FromStr;
 
 // ─── Error ────────────────────────────────────────────────
 
@@ -41,6 +43,8 @@ pub enum Error {
     InvalidTaskToken { token: String },
     #[error("scope reason must be non-empty and single-line: {reason}")]
     InvalidScopeReason { reason: String },
+    #[error("unknown workspace role token: {role}")]
+    UnknownRoleName { role: String },
 }
 
 // ─── Identity ─────────────────────────────────────────────
@@ -70,6 +74,77 @@ pub enum RoleName {
     SystemAssistant,
     Poet,
     PoetAssistant,
+}
+
+impl RoleName {
+    pub const ALL: [Self; 8] = [
+        Self::Operator,
+        Self::OperatorAssistant,
+        Self::Designer,
+        Self::DesignerAssistant,
+        Self::SystemSpecialist,
+        Self::SystemAssistant,
+        Self::Poet,
+        Self::PoetAssistant,
+    ];
+
+    pub const fn as_wire_token(self) -> &'static str {
+        match self {
+            Self::Operator => "operator",
+            Self::OperatorAssistant => "operator-assistant",
+            Self::Designer => "designer",
+            Self::DesignerAssistant => "designer-assistant",
+            Self::SystemSpecialist => "system-specialist",
+            Self::SystemAssistant => "system-assistant",
+            Self::Poet => "poet",
+            Self::PoetAssistant => "poet-assistant",
+        }
+    }
+
+    pub fn from_wire_token(role: impl Into<String>) -> Result<Self> {
+        let role = role.into();
+        match role.as_str() {
+            "operator" => Ok(Self::Operator),
+            "operator-assistant" => Ok(Self::OperatorAssistant),
+            "designer" => Ok(Self::Designer),
+            "designer-assistant" => Ok(Self::DesignerAssistant),
+            "system-specialist" => Ok(Self::SystemSpecialist),
+            "system-assistant" => Ok(Self::SystemAssistant),
+            "poet" => Ok(Self::Poet),
+            "poet-assistant" => Ok(Self::PoetAssistant),
+            _ => Err(Error::UnknownRoleName { role }),
+        }
+    }
+}
+
+impl fmt::Display for RoleName {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_wire_token())
+    }
+}
+
+impl FromStr for RoleName {
+    type Err = Error;
+
+    fn from_str(role: &str) -> Result<Self> {
+        Self::from_wire_token(role)
+    }
+}
+
+impl TryFrom<String> for RoleName {
+    type Error = Error;
+
+    fn try_from(role: String) -> Result<Self> {
+        Self::from_wire_token(role)
+    }
+}
+
+impl TryFrom<&str> for RoleName {
+    type Error = Error;
+
+    fn try_from(role: &str) -> Result<Self> {
+        Self::from_wire_token(role)
+    }
 }
 
 // ─── Scope reference ──────────────────────────────────────

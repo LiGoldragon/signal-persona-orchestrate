@@ -27,7 +27,8 @@ If your change adds a new request or reply variant, edit
 
 - `RoleName` (closed enum: Operator, OperatorAssistant,
   Designer, DesignerAssistant, SystemSpecialist,
-  SystemAssistant, Poet, PoetAssistant).
+  SystemAssistant, Poet, PoetAssistant, plus canonical
+  workspace role token parsing/rendering).
 - `ScopeReference` (closed enum: Path | Task) plus
   `WirePath` and `TaskToken` newtypes.
 - `ScopeReason` (provisional `String` newtype).
