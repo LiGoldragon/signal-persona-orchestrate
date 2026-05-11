@@ -577,7 +577,7 @@ fn activity_list_round_trips() {
             Activity {
                 role: RoleName::Operator,
                 scope: sample_task_scope(),
-                reason: ScopeReason::from_text("ractor adoption").expect("scope reason"),
+                reason: ScopeReason::from_text("kameo adoption").expect("scope reason"),
                 stamped_at: TimestampNanos::new(1_730_000_001_000_000_000),
             },
         ],
