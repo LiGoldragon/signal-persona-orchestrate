@@ -11,8 +11,8 @@ channel carries:
 - **Role lifecycle:** `RoleClaim`, `RoleRelease`,
   `RoleHandoff`, `RoleObservation`.
 - **Activity log:** `ActivitySubmission`, `ActivityQuery`.
-- **Memory/work graph:** `Open`, `AddNote`, `Link`, `ChangeStatus`,
-  `AddAlias`, `Query`.
+- **Memory/work graph:** `Opening`, `NoteSubmission`, `Link`,
+  `StatusChange`, `AliasAssignment`, `Query`.
 
 ## Quick reference
 
