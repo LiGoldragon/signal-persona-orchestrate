@@ -11,6 +11,12 @@ defines the typed request/reply channel used by the `mind` CLI,
 external `tools/orchestrate` cutover wrappers, and long-lived `persona-mind`
 daemon.
 
+> **Scope.** This contract sits on today's stack — `signal-core` wire,
+> rkyv archives, `sema-db` storage in consumers. The
+> eventually-self-hosting stack is Sema-on-Sema, in which signal-*
+> as a separate vocabulary layer collapses. Today's contract is a
+> realization step. See `~/primary/ESSENCE.md` §"Today and eventually".
+
 This repo owns records, validation newtypes, rkyv round trips, and channel
 shape. It does not own the CLI binary, actors, database, storage tables,
 transport lifecycle, or lock-file migration.
