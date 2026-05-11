@@ -28,6 +28,7 @@
 
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use signal_core::signal_channel;
+use signal_persona_auth::{ChannelId, ComponentName, ConnectionClass, MessageOrigin};
 use std::fmt;
 use std::str::FromStr;
 
@@ -928,6 +929,128 @@ pub enum RejectionReason {
     CollisionUnresolved,
 }
 
+// ─── Channel Choreography ─────────────────────────────────
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AdjudicationRequestId(String);
+
+impl AdjudicationRequestId {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+pub enum ChannelEndpoint {
+    Internal(ComponentName),
+    External(ConnectionClass),
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ChannelMessageKind {
+    MessageSubmission,
+    InboxQuery,
+    FocusObservation,
+    PromptBufferObservation,
+    MessageDelivery,
+    TerminalInput,
+    TerminalCapture,
+    TerminalResize,
+    TranscriptEvent,
+    AdjudicationRequest,
+    DeliveryNotification,
+    ChannelGrant,
+    ChannelExtend,
+    ChannelRetract,
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ChannelDuration {
+    OneShot,
+    Permanent,
+    TimeBound(TimestampNanos),
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct AdjudicationRequest {
+    pub request: AdjudicationRequestId,
+    pub origin: MessageOrigin,
+    pub destination: ChannelEndpoint,
+    pub kind: ChannelMessageKind,
+    pub body_summary: TextBody,
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct AdjudicationReceipt {
+    pub request: AdjudicationRequestId,
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ChannelGrant {
+    pub source: ChannelEndpoint,
+    pub destination: ChannelEndpoint,
+    pub kinds: Vec<ChannelMessageKind>,
+    pub duration: ChannelDuration,
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ChannelExtend {
+    pub channel: ChannelId,
+    pub duration: ChannelDuration,
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ChannelRetract {
+    pub channel: ChannelId,
+    pub reason: TextBody,
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct AdjudicationDeny {
+    pub request: AdjudicationRequestId,
+    pub reason: TextBody,
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ChannelList {
+    pub filters: Vec<ChannelFilter>,
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+pub enum ChannelFilter {
+    Source(ChannelEndpoint),
+    Destination(ChannelEndpoint),
+    Kind(ChannelMessageKind),
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ChannelReceipt {
+    pub channel: ChannelId,
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct AdjudicationDenyReceipt {
+    pub request: AdjudicationRequestId,
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ChannelView {
+    pub channel: ChannelId,
+    pub source: ChannelEndpoint,
+    pub destination: ChannelEndpoint,
+    pub kinds: Vec<ChannelMessageKind>,
+    pub duration: ChannelDuration,
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ChannelListView {
+    pub channels: Vec<ChannelView>,
+}
+
 // ─── Channel declaration ──────────────────────────────────
 
 signal_channel! {
@@ -944,6 +1067,12 @@ signal_channel! {
         StatusChange(StatusChange),
         AliasAssignment(AliasAssignment),
         Query(Query),
+        AdjudicationRequest(AdjudicationRequest),
+        ChannelGrant(ChannelGrant),
+        ChannelExtend(ChannelExtend),
+        ChannelRetract(ChannelRetract),
+        AdjudicationDeny(AdjudicationDeny),
+        ChannelList(ChannelList),
     }
     reply MindReply {
         ClaimAcceptance(ClaimAcceptance),
@@ -961,5 +1090,9 @@ signal_channel! {
         AliasReceipt(AliasReceipt),
         View(View),
         Rejection(Rejection),
+        AdjudicationReceipt(AdjudicationReceipt),
+        ChannelReceipt(ChannelReceipt),
+        AdjudicationDenyReceipt(AdjudicationDenyReceipt),
+        ChannelListView(ChannelListView),
     }
 }

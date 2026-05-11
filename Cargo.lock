@@ -255,11 +255,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "signal-persona-auth"
+version = "0.1.0"
+source = "git+https://github.com/LiGoldragon/signal-persona-auth.git#3ec5f82ea79ff4fc3db652af75b3e270141cca13"
+dependencies = [
+ "rkyv",
+ "signal-core",
+]
+
+[[package]]
 name = "signal-persona-mind"
 version = "0.1.0"
 dependencies = [
  "rkyv",
  "signal-core",
+ "signal-persona-auth",
  "thiserror",
 ]
 

@@ -70,6 +70,12 @@ signal_channel! {
         StatusChange(StatusChange),
         AliasAssignment(AliasAssignment),
         Query(Query),
+        AdjudicationRequest(AdjudicationRequest),
+        ChannelGrant(ChannelGrant),
+        ChannelExtend(ChannelExtend),
+        ChannelRetract(ChannelRetract),
+        AdjudicationDeny(AdjudicationDeny),
+        ChannelList(ChannelList),
     }
     reply MindReply {
         ClaimAcceptance(ClaimAcceptance),
@@ -87,6 +93,10 @@ signal_channel! {
         AliasReceipt(AliasReceipt),
         View(View),
         Rejection(Rejection),
+        AdjudicationReceipt(AdjudicationReceipt),
+        ChannelReceipt(ChannelReceipt),
+        AdjudicationDenyReceipt(AdjudicationDenyReceipt),
+        ChannelListView(ChannelListView),
     }
 }
 ```
@@ -135,6 +145,33 @@ These records are the active native replacement for BEADS as a work/memory
 graph. Imported BEADS IDs are represented as aliases or external references;
 the contract does not model a live BEADS backend.
 
+### 3.4 Channel choreography
+
+| Request | Reply |
+|---|---|
+| `AdjudicationRequest` | `AdjudicationReceipt` |
+| `ChannelGrant` | `ChannelReceipt` |
+| `ChannelExtend` | `ChannelReceipt` |
+| `ChannelRetract` | `ChannelReceipt` |
+| `AdjudicationDeny` | `AdjudicationDenyReceipt` |
+| `ChannelList` | `ChannelListView` |
+
+These records are the typed boundary between `persona-router` and
+`persona-mind` for channel choreography. Router parks a message whose
+channel is missing or inactive and submits `AdjudicationRequest`. Mind replies
+by recording the request, deciding policy internally, and later emitting a
+grant, extension, retraction, deny, or channel view through the same closed
+contract vocabulary.
+
+The endpoint and kind vocabulary is typed:
+
+- `ChannelEndpoint` is either `Internal(ComponentName)` or
+  `External(ConnectionClass)`.
+- `ChannelMessageKind` is a closed enum for first-stack route categories such
+  as message submission, inbox query, message delivery, terminal input, prompt
+  observation, adjudication, and channel grant/retract traffic.
+- `ChannelDuration` is `OneShot`, `Permanent`, or `TimeBound(TimestampNanos)`.
+
 ## 4 · Boundary Newtypes
 
 The contract validates boundary strings before they become wire values.
@@ -150,6 +187,10 @@ The contract validates boundary strings before they become wire values.
 | `StableItemId` | internal work graph identity. |
 | `DisplayId` | short human identity for work graph references. |
 | `ExternalAlias` | imported or external identifiers. |
+| `AdjudicationRequestId` | short router-minted identifier for one parked adjudication request. |
+| `ChannelEndpoint` | typed internal/external route endpoint using `signal-persona-auth`. |
+| `ChannelMessageKind` | closed set of first-stack route categories. |
+| `ChannelDuration` | channel lifetime requested or emitted by mind choreography. |
 
 Strings in `Title`, `Body`, and path-like wrappers are provisional where the
 semantic shape is still evolving. They are still typed at the boundary; callers
@@ -205,6 +246,10 @@ catch-all records.
   `TimestampNanos`.
 - Lock files and BEADS are represented only as temporary external references or
   aliases, never as live backend protocol.
+- Channel choreography records use `signal-persona-auth` endpoint and origin
+  types; they do not carry proof material.
+- Channel choreography is closed vocabulary; there is no stringly "kind" or
+  catch-all request.
 - This contract crate contains no CLI, daemon, actor runtime, database table,
   transport, or migration implementation.
 - The text surface is NOTA projected into these exact records; there is no
@@ -219,6 +264,7 @@ Existing tests in `tests/round_trip.rs` cover:
 - memory/work variants;
 - every `QueryKind`;
 - every `EdgeKind`;
+- channel choreography request/reply variants;
 - scope variants;
 - external references;
 - boundary validation.

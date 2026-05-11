@@ -7,9 +7,13 @@
 //! length-prefixed Frame.
 
 use signal_core::{FrameBody, Reply, Request, SemaVerb};
+use signal_persona_auth::{ChannelId, ComponentName, ConnectionClass, MessageOrigin};
 use signal_persona_mind::{
     Activity, ActivityAcknowledgment, ActivityFilter, ActivityList, ActivityQuery,
-    ActivitySubmission, ActorName, AliasAddedEvent, AliasAssignment, AliasReceipt, BeadsToken,
+    ActivitySubmission, ActorName, AdjudicationDeny, AdjudicationDenyReceipt, AdjudicationReceipt,
+    AdjudicationRequest, AdjudicationRequestId, AliasAddedEvent, AliasAssignment, AliasReceipt,
+    BeadsToken, ChannelDuration, ChannelEndpoint, ChannelExtend, ChannelFilter, ChannelGrant,
+    ChannelList, ChannelListView, ChannelMessageKind, ChannelReceipt, ChannelRetract, ChannelView,
     ClaimAcceptance, ClaimEntry, ClaimRejection, CommitHash, DisplayId, Edge, EdgeAddedEvent,
     EdgeKind, EdgeTarget, Event, EventHeader, EventSeq, ExternalAlias, ExternalReference, Frame,
     HandoffAcceptance, HandoffRejection, HandoffRejectionReason, Item, ItemKind, ItemOpenedEvent,
@@ -65,6 +69,22 @@ fn sample_path_scope() -> ScopeReference {
 
 fn sample_task_scope() -> ScopeReference {
     ScopeReference::Task(sample_task())
+}
+
+fn sample_adjudication_request() -> AdjudicationRequestId {
+    AdjudicationRequestId::new("aab")
+}
+
+fn sample_channel() -> ChannelId {
+    ChannelId::new("channel-aab")
+}
+
+fn sample_internal_endpoint(component: ComponentName) -> ChannelEndpoint {
+    ChannelEndpoint::Internal(component)
+}
+
+fn sample_external_owner_endpoint() -> ChannelEndpoint {
+    ChannelEndpoint::External(ConnectionClass::Owner)
 }
 
 struct MemoryFixture {
@@ -457,6 +477,58 @@ fn every_external_reference_variant_round_trips_as_a_link_target() {
     }
 }
 
+#[test]
+fn adjudication_request_round_trips() {
+    let request = MindRequest::AdjudicationRequest(AdjudicationRequest {
+        request: sample_adjudication_request(),
+        origin: MessageOrigin::External(ConnectionClass::Owner),
+        destination: sample_internal_endpoint(ComponentName::Router),
+        kind: ChannelMessageKind::MessageSubmission,
+        body_summary: TextBody::new("owner asks router to deliver a prompt"),
+    });
+    let decoded = round_trip_request(request.clone());
+    assert_eq!(decoded, request);
+}
+
+#[test]
+fn channel_choreography_requests_round_trip() {
+    let requests = vec![
+        MindRequest::ChannelGrant(ChannelGrant {
+            source: sample_external_owner_endpoint(),
+            destination: sample_internal_endpoint(ComponentName::Router),
+            kinds: vec![
+                ChannelMessageKind::MessageSubmission,
+                ChannelMessageKind::InboxQuery,
+            ],
+            duration: ChannelDuration::Permanent,
+        }),
+        MindRequest::ChannelExtend(ChannelExtend {
+            channel: sample_channel(),
+            duration: ChannelDuration::TimeBound(TimestampNanos::new(1_730_000_000_000_000_000)),
+        }),
+        MindRequest::ChannelRetract(ChannelRetract {
+            channel: sample_channel(),
+            reason: TextBody::new("operator closed the path"),
+        }),
+        MindRequest::AdjudicationDeny(AdjudicationDeny {
+            request: sample_adjudication_request(),
+            reason: TextBody::new("destination is unavailable"),
+        }),
+        MindRequest::ChannelList(ChannelList {
+            filters: vec![
+                ChannelFilter::Source(sample_internal_endpoint(ComponentName::Mind)),
+                ChannelFilter::Destination(sample_internal_endpoint(ComponentName::Router)),
+                ChannelFilter::Kind(ChannelMessageKind::ChannelGrant),
+            ],
+        }),
+    ];
+
+    for request in requests {
+        let decoded = round_trip_request(request.clone());
+        assert_eq!(decoded, request);
+    }
+}
+
 // ─── Reply variants ───────────────────────────────────────
 
 #[test]
@@ -608,6 +680,38 @@ fn memory_receipt_replies_round_trip() {
         MindReply::View(fixture.view()),
         MindReply::Rejection(Rejection {
             reason: RejectionReason::UnknownItem,
+        }),
+    ];
+
+    for reply in replies {
+        let decoded = round_trip_reply(reply.clone());
+        assert_eq!(decoded, reply);
+    }
+}
+
+#[test]
+fn channel_choreography_replies_round_trip() {
+    let replies = vec![
+        MindReply::AdjudicationReceipt(AdjudicationReceipt {
+            request: sample_adjudication_request(),
+        }),
+        MindReply::ChannelReceipt(ChannelReceipt {
+            channel: sample_channel(),
+        }),
+        MindReply::AdjudicationDenyReceipt(AdjudicationDenyReceipt {
+            request: sample_adjudication_request(),
+        }),
+        MindReply::ChannelListView(ChannelListView {
+            channels: vec![ChannelView {
+                channel: sample_channel(),
+                source: sample_internal_endpoint(ComponentName::Mind),
+                destination: sample_internal_endpoint(ComponentName::Router),
+                kinds: vec![
+                    ChannelMessageKind::ChannelGrant,
+                    ChannelMessageKind::ChannelRetract,
+                ],
+                duration: ChannelDuration::OneShot,
+            }],
         }),
     ];
 
