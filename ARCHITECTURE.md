@@ -201,8 +201,11 @@ do not pass unstructured maps.
 The required text surface is NOTA. Nexus may supply the semantic content shape
 inside NOTA, but there is no second text syntax.
 
-The projection is not implemented in this repo yet. When it lands, it should
-round trip through these records directly:
+The contract records implement NOTA directly. Root `MindRequest` and
+`MindReply` text decoding dispatches through `signal_core::signal_channel!`;
+payload records derive or implement NOTA in this crate. Validating boundary
+newtypes such as `WirePath`, `TaskToken`, and `ScopeReason` decode through
+their constructors, so text input cannot bypass boundary validation.
 
 ```mermaid
 flowchart LR
@@ -212,16 +215,17 @@ flowchart LR
     encode --> text_again[NOTA record]
 ```
 
-Illustrative command shapes:
+Representative contract text shapes:
 
 ```text
-(RoleClaim Operator ((Path "/git/github.com/LiGoldragon/persona-mind")) "implement command-line mind")
-(Query Ready 20)
+(RoleClaim Designer [(Path "/git/github.com/LiGoldragon/signal-persona-mind/src/lib.rs") (Task primary-f99)] "design-cascade per /93")
+(Query (Ready) 25)
 (Opening Task High "wire command-line mind" "replace lock helper with typed state")
 ```
 
-The exact spelling is a projection decision. The invariant is that the parsed
-value is one of the `MindRequest` variants declared here.
+Surface owners decide where this NOTA is accepted or rendered. This crate owns
+the codec on the contract types, and the parsed value is one of the
+`MindRequest` or `MindReply` variants declared here.
 
 ## 6 · Versioning
 
@@ -260,6 +264,8 @@ catch-all records.
 Existing tests in `tests/round_trip.rs` cover:
 
 - request/reply frame round trips;
+- representative NOTA text round trips for root requests and replies:
+  `RoleClaim`, `Query`, `ChannelGrant`, and `ClaimAcceptance`;
 - role and activity variants;
 - memory/work variants;
 - every `QueryKind`;
@@ -267,14 +273,13 @@ Existing tests in `tests/round_trip.rs` cover:
 - channel choreography request/reply variants;
 - scope variants;
 - external references;
-- boundary validation.
+- boundary validation, including `WirePath` NOTA decode rejection.
 - workspace role coverage.
 
-Missing tests for the next wave:
+Additional architecture guards still worth adding:
 
 | Test | Proves |
 |---|---|
-| `nota_projection_round_trips_role_claim` | contract owns the text codec round-trip for this record. |
 | `nota_projection_rejects_cli_only_command` | no second command language. |
 | `request_payload_cannot_carry_timestamp` | store mints time. |
 | `request_payload_cannot_carry_event_sequence` | store mints sequence. |
@@ -297,8 +302,8 @@ This repo does not own:
 ## Code Map
 
 ```text
-src/lib.rs              payload records and signal_channel! declaration
-tests/round_trip.rs     per-variant wire-form round trips and validation tests
+src/lib.rs              payload records, NOTA codecs, and signal_channel! declaration
+tests/round_trip.rs     frame round trips, NOTA witnesses, and validation tests
 ```
 
 ## See Also
