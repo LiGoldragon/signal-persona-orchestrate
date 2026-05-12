@@ -18,12 +18,13 @@ use signal_persona_mind::{
     ClaimAcceptance, ClaimEntry, ClaimRejection, CommitHash, DisplayId, Edge, EdgeAddedEvent,
     EdgeKind, EdgeTarget, Event, EventHeader, EventSeq, ExternalAlias, ExternalReference, Frame,
     HandoffAcceptance, HandoffRejection, HandoffRejectionReason, Item, ItemKind, ItemOpenedEvent,
-    ItemPriority, ItemReference, ItemStatus, Link, LinkReceipt, LinkTarget, MindReply, MindRequest,
-    Note, NoteAddedEvent, NoteReceipt, NoteSubmission, Opening, OpeningReceipt, OperationId, Query,
-    QueryKind, QueryLimit, ReferencePath, Rejection, RejectionReason, ReleaseAcknowledgment,
-    ReportPath, RoleClaim, RoleHandoff, RoleName, RoleObservation, RoleRelease, RoleSnapshot,
-    RoleStatus, ScopeConflict, ScopeReason, ScopeReference, StableItemId, StatusChange,
-    StatusChangedEvent, StatusReceipt, TaskToken, TextBody, TimestampNanos, Title, View, WirePath,
+    ItemPriority, ItemReference, ItemStatus, Link, LinkReceipt, LinkTarget, MindOperationKind,
+    MindReply, MindRequest, Note, NoteAddedEvent, NoteReceipt, NoteSubmission, Opening,
+    OpeningReceipt, OperationId, Query, QueryKind, QueryLimit, ReferencePath, Rejection,
+    RejectionReason, ReleaseAcknowledgment, ReportPath, RoleClaim, RoleHandoff, RoleName,
+    RoleObservation, RoleRelease, RoleSnapshot, RoleStatus, ScopeConflict, ScopeReason,
+    ScopeReference, StableItemId, StatusChange, StatusChangedEvent, StatusReceipt, TaskToken,
+    TextBody, TimestampNanos, Title, View, WirePath,
 };
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -581,6 +582,157 @@ fn channel_grant_request_round_trips_through_nota_text() {
         }),
         "(ChannelGrant (External (Owner)) (Internal Router) [MessageSubmission InboxQuery] (Permanent))",
     );
+}
+
+#[test]
+fn mind_request_exposes_contract_owned_operation_kind() {
+    let fixture = MemoryFixture::new();
+    let cases = vec![
+        (
+            MindRequest::RoleClaim(RoleClaim {
+                role: RoleName::Designer,
+                scopes: vec![sample_path_scope()],
+                reason: sample_reason(),
+            }),
+            MindOperationKind::RoleClaim,
+        ),
+        (
+            MindRequest::RoleRelease(RoleRelease {
+                role: RoleName::Designer,
+            }),
+            MindOperationKind::RoleRelease,
+        ),
+        (
+            MindRequest::RoleHandoff(RoleHandoff {
+                from: RoleName::Designer,
+                to: RoleName::Operator,
+                scopes: vec![sample_path_scope()],
+                reason: sample_reason(),
+            }),
+            MindOperationKind::RoleHandoff,
+        ),
+        (
+            MindRequest::RoleObservation(RoleObservation),
+            MindOperationKind::RoleObservation,
+        ),
+        (
+            MindRequest::ActivitySubmission(ActivitySubmission {
+                role: RoleName::Operator,
+                scope: sample_path_scope(),
+                reason: sample_reason(),
+            }),
+            MindOperationKind::ActivitySubmission,
+        ),
+        (
+            MindRequest::ActivityQuery(ActivityQuery {
+                limit: 10,
+                filters: vec![ActivityFilter::RoleFilter(RoleName::Operator)],
+            }),
+            MindOperationKind::ActivityQuery,
+        ),
+        (
+            MindRequest::Opening(Opening {
+                kind: ItemKind::Task,
+                priority: ItemPriority::High,
+                title: Title::new("Add operation kinds"),
+                body: TextBody::new("Expose discriminants from the contract crate."),
+            }),
+            MindOperationKind::Opening,
+        ),
+        (
+            MindRequest::NoteSubmission(NoteSubmission {
+                item: ItemReference::Stable(fixture.item_id.clone()),
+                body: TextBody::new("Contract-owned discriminant witness."),
+            }),
+            MindOperationKind::NoteSubmission,
+        ),
+        (
+            MindRequest::Link(Link {
+                source: ItemReference::Stable(fixture.item_id.clone()),
+                kind: EdgeKind::References,
+                target: LinkTarget::External(ExternalReference::File(ReferencePath::new(
+                    "/git/github.com/LiGoldragon/signal-persona-mind/src/lib.rs",
+                ))),
+                body: None,
+            }),
+            MindOperationKind::Link,
+        ),
+        (
+            MindRequest::StatusChange(StatusChange {
+                item: ItemReference::Stable(fixture.item_id.clone()),
+                status: ItemStatus::InProgress,
+                body: None,
+            }),
+            MindOperationKind::StatusChange,
+        ),
+        (
+            MindRequest::AliasAssignment(AliasAssignment {
+                item: ItemReference::Stable(fixture.item_id.clone()),
+                alias: ExternalAlias::new("primary-aab"),
+            }),
+            MindOperationKind::AliasAssignment,
+        ),
+        (
+            MindRequest::Query(Query {
+                kind: QueryKind::Ready,
+                limit: QueryLimit::new(10),
+            }),
+            MindOperationKind::Query,
+        ),
+        (
+            MindRequest::AdjudicationRequest(AdjudicationRequest {
+                request: sample_adjudication_request(),
+                origin: MessageOrigin::External(ConnectionClass::Owner),
+                destination: sample_internal_endpoint(ComponentName::Router),
+                kind: ChannelMessageKind::MessageSubmission,
+                body_summary: TextBody::new("owner request"),
+            }),
+            MindOperationKind::AdjudicationRequest,
+        ),
+        (
+            MindRequest::ChannelGrant(ChannelGrant {
+                source: sample_external_owner_endpoint(),
+                destination: sample_internal_endpoint(ComponentName::Router),
+                kinds: vec![ChannelMessageKind::MessageSubmission],
+                duration: ChannelDuration::Permanent,
+            }),
+            MindOperationKind::ChannelGrant,
+        ),
+        (
+            MindRequest::ChannelExtend(ChannelExtend {
+                channel: sample_channel(),
+                duration: ChannelDuration::OneShot,
+            }),
+            MindOperationKind::ChannelExtend,
+        ),
+        (
+            MindRequest::ChannelRetract(ChannelRetract {
+                channel: sample_channel(),
+                reason: TextBody::new("operator closed the path"),
+            }),
+            MindOperationKind::ChannelRetract,
+        ),
+        (
+            MindRequest::AdjudicationDeny(AdjudicationDeny {
+                request: sample_adjudication_request(),
+                reason: TextBody::new("destination unavailable"),
+            }),
+            MindOperationKind::AdjudicationDeny,
+        ),
+        (
+            MindRequest::ChannelList(ChannelList { filters: vec![] }),
+            MindOperationKind::ChannelList,
+        ),
+    ];
+
+    for (request, operation) in cases {
+        assert_eq!(request.operation_kind(), operation);
+    }
+}
+
+#[test]
+fn mind_operation_kind_round_trips_through_nota_text() {
+    round_trip_nota(MindOperationKind::ChannelGrant, "ChannelGrant");
 }
 
 // ─── Reply variants ───────────────────────────────────────

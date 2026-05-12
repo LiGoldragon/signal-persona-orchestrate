@@ -1619,6 +1619,30 @@ pub struct ChannelList {
     pub filters: Vec<ChannelFilter>,
 }
 
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaEnum, Debug, Clone, Copy, PartialEq, Eq, Hash,
+)]
+pub enum MindOperationKind {
+    RoleClaim,
+    RoleRelease,
+    RoleHandoff,
+    RoleObservation,
+    ActivitySubmission,
+    ActivityQuery,
+    Opening,
+    NoteSubmission,
+    Link,
+    StatusChange,
+    AliasAssignment,
+    Query,
+    AdjudicationRequest,
+    ChannelGrant,
+    ChannelExtend,
+    ChannelRetract,
+    AdjudicationDeny,
+    ChannelList,
+}
+
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
 pub enum ChannelFilter {
     Source(ChannelEndpoint),
@@ -1745,5 +1769,30 @@ signal_channel! {
         ChannelReceipt(ChannelReceipt),
         AdjudicationDenyReceipt(AdjudicationDenyReceipt),
         ChannelListView(ChannelListView),
+    }
+}
+
+impl MindRequest {
+    pub fn operation_kind(&self) -> MindOperationKind {
+        match self {
+            Self::RoleClaim(_) => MindOperationKind::RoleClaim,
+            Self::RoleRelease(_) => MindOperationKind::RoleRelease,
+            Self::RoleHandoff(_) => MindOperationKind::RoleHandoff,
+            Self::RoleObservation(_) => MindOperationKind::RoleObservation,
+            Self::ActivitySubmission(_) => MindOperationKind::ActivitySubmission,
+            Self::ActivityQuery(_) => MindOperationKind::ActivityQuery,
+            Self::Opening(_) => MindOperationKind::Opening,
+            Self::NoteSubmission(_) => MindOperationKind::NoteSubmission,
+            Self::Link(_) => MindOperationKind::Link,
+            Self::StatusChange(_) => MindOperationKind::StatusChange,
+            Self::AliasAssignment(_) => MindOperationKind::AliasAssignment,
+            Self::Query(_) => MindOperationKind::Query,
+            Self::AdjudicationRequest(_) => MindOperationKind::AdjudicationRequest,
+            Self::ChannelGrant(_) => MindOperationKind::ChannelGrant,
+            Self::ChannelExtend(_) => MindOperationKind::ChannelExtend,
+            Self::ChannelRetract(_) => MindOperationKind::ChannelRetract,
+            Self::AdjudicationDeny(_) => MindOperationKind::AdjudicationDeny,
+            Self::ChannelList(_) => MindOperationKind::ChannelList,
+        }
     }
 }
