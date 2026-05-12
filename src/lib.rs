@@ -26,6 +26,10 @@
 //! boundaries; `~/primary/skills/contract-repo.md` for the
 //! contract-repo discipline this crate follows.
 
+use nota_codec::{
+    Decoder, Encoder, NotaDecode, NotaEncode, NotaEnum, NotaRecord, NotaSum, NotaTransparent,
+    NotaTryTransparent,
+};
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use signal_core::signal_channel;
 use signal_persona_auth::{ChannelId, ComponentName, ConnectionClass, MessageOrigin};
@@ -65,6 +69,7 @@ pub enum Error {
     Hash,
     PartialOrd,
     Ord,
+    NotaEnum,
 )]
 pub enum RoleName {
     Operator,
@@ -160,14 +165,61 @@ pub enum ScopeReference {
     Task(TaskToken),
 }
 
+impl NotaEncode for ScopeReference {
+    fn encode(&self, encoder: &mut Encoder) -> nota_codec::Result<()> {
+        match self {
+            Self::Path(path) => {
+                encoder.start_record("Path")?;
+                path.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::Task(task) => {
+                encoder.start_record("Task")?;
+                task.encode(encoder)?;
+                encoder.end_record()
+            }
+        }
+    }
+}
+
+impl NotaDecode for ScopeReference {
+    fn decode(decoder: &mut Decoder<'_>) -> nota_codec::Result<Self> {
+        let head = decoder.peek_record_head()?;
+        match head.as_str() {
+            "Path" => {
+                decoder.expect_record_head("Path")?;
+                let path = WirePath::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::Path(path))
+            }
+            "Task" => {
+                decoder.expect_record_head("Task")?;
+                let task = TaskToken::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::Task(task))
+            }
+            other => Err(nota_codec::Error::UnknownKindForVerb {
+                verb: "ScopeReference",
+                got: other.to_string(),
+            }),
+        }
+    }
+}
+
 /// Absolute path, newtyped for cross-platform stability on
 /// the wire (per `~/primary/skills/rust-discipline.md`
 /// §"Newtype the wire form" — `PathBuf` archives
 /// non-deterministically).
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaTryTransparent, Debug, Clone, PartialEq, Eq, Hash,
+)]
 pub struct WirePath(String);
 
 impl WirePath {
+    pub fn try_new(path: String) -> Result<Self> {
+        Self::from_absolute_path(path)
+    }
+
     pub fn from_absolute_path(path: impl Into<String>) -> Result<Self> {
         let path = path.into();
 
@@ -218,10 +270,16 @@ impl AsRef<str> for WirePath {
 /// A bracketed task identifier (stored without brackets).
 /// Bracketed form like `[primary-f99]` is the human surface;
 /// the wire carries the raw token.
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaTryTransparent, Debug, Clone, PartialEq, Eq, Hash,
+)]
 pub struct TaskToken(String);
 
 impl TaskToken {
+    pub fn try_new(token: String) -> Result<Self> {
+        Self::from_wire_token(token)
+    }
+
     pub fn from_wire_token(token: impl Into<String>) -> Result<Self> {
         let token = token.into();
         if token.is_empty()
@@ -268,10 +326,16 @@ impl AsRef<str> for TaskToken {
 /// `~/primary/reports/designer/92-sema-as-database-library-architecture-revamp.md`
 /// §4 — strings allowed here until the typed Nexus record
 /// shape for "intent" is named.
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaTryTransparent, Debug, Clone, PartialEq, Eq, Hash,
+)]
 pub struct ScopeReason(String);
 
 impl ScopeReason {
+    pub fn try_new(reason: String) -> Result<Self> {
+        Self::from_text(reason)
+    }
+
     pub fn from_text(reason: impl Into<String>) -> Result<Self> {
         let reason = reason.into();
         if reason.trim().is_empty() || reason.contains('\n') || reason.contains('\r') {
@@ -324,6 +388,7 @@ impl AsRef<str> for ScopeReason {
     Hash,
     PartialOrd,
     Ord,
+    NotaTransparent,
 )]
 pub struct TimestampNanos(u64);
 
@@ -342,26 +407,26 @@ impl TimestampNanos {
 /// A role asks to claim one or more scopes with a short
 /// reason. Reply: `ClaimAcceptance` on success, `ClaimRejection`
 /// listing every conflict on failure.
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct RoleClaim {
     pub role: RoleName,
     pub scopes: Vec<ScopeReference>,
     pub reason: ScopeReason,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ClaimAcceptance {
     pub role: RoleName,
     pub scopes: Vec<ScopeReference>,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ClaimRejection {
     pub role: RoleName,
     pub conflicts: Vec<ScopeConflict>,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ScopeConflict {
     pub scope: ScopeReference,
     pub held_by: RoleName,
@@ -372,12 +437,14 @@ pub struct ScopeConflict {
 
 /// A role releases all of its currently-held scopes.
 /// Reply: `ReleaseAcknowledgment` listing what was released.
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, Copy, PartialEq, Eq,
+)]
 pub struct RoleRelease {
     pub role: RoleName,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ReleaseAcknowledgment {
     pub role: RoleName,
     pub released_scopes: Vec<ScopeReference>,
@@ -388,7 +455,7 @@ pub struct ReleaseAcknowledgment {
 /// One role hands a set of scopes to another role atomically.
 /// Reply: `HandoffAcceptance` on success, `HandoffRejection`
 /// with a typed reason on failure.
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct RoleHandoff {
     pub from: RoleName,
     pub to: RoleName,
@@ -396,14 +463,14 @@ pub struct RoleHandoff {
     pub reason: ScopeReason,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct HandoffAcceptance {
     pub from: RoleName,
     pub to: RoleName,
     pub scopes: Vec<ScopeReference>,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct HandoffRejection {
     pub from: RoleName,
     pub to: RoleName,
@@ -420,26 +487,67 @@ pub enum HandoffRejectionReason {
     TargetRoleConflict(Vec<ScopeConflict>),
 }
 
+impl NotaEncode for HandoffRejectionReason {
+    fn encode(&self, encoder: &mut Encoder) -> nota_codec::Result<()> {
+        match self {
+            Self::SourceRoleDoesNotHold => {
+                encoder.start_record("SourceRoleDoesNotHold")?;
+                encoder.end_record()
+            }
+            Self::TargetRoleConflict(conflicts) => {
+                encoder.start_record("TargetRoleConflict")?;
+                conflicts.encode(encoder)?;
+                encoder.end_record()
+            }
+        }
+    }
+}
+
+impl NotaDecode for HandoffRejectionReason {
+    fn decode(decoder: &mut Decoder<'_>) -> nota_codec::Result<Self> {
+        let head = decoder.peek_record_head()?;
+        match head.as_str() {
+            "SourceRoleDoesNotHold" => {
+                decoder.expect_record_head("SourceRoleDoesNotHold")?;
+                decoder.expect_record_end()?;
+                Ok(Self::SourceRoleDoesNotHold)
+            }
+            "TargetRoleConflict" => {
+                decoder.expect_record_head("TargetRoleConflict")?;
+                let conflicts = Vec::<ScopeConflict>::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::TargetRoleConflict(conflicts))
+            }
+            other => Err(nota_codec::Error::UnknownKindForVerb {
+                verb: "HandoffRejectionReason",
+                got: other.to_string(),
+            }),
+        }
+    }
+}
+
 // ─── Observation ──────────────────────────────────────────
 
 /// Request a snapshot of every role's active claims plus the
 /// most recent activity entries. Reply: `RoleSnapshot`.
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, Copy, PartialEq, Eq,
+)]
 pub struct RoleObservation;
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct RoleSnapshot {
     pub roles: Vec<RoleStatus>,
     pub recent_activity: Vec<Activity>,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct RoleStatus {
     pub role: RoleName,
     pub claims: Vec<ClaimEntry>,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ClaimEntry {
     pub scope: ScopeReference,
     pub reason: ScopeReason,
@@ -450,7 +558,7 @@ pub struct ClaimEntry {
 /// One activity record: who touched what and why. Time is
 /// store-supplied (per ESSENCE infrastructure-mints rule —
 /// the agent never invents timestamps).
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct Activity {
     pub role: RoleName,
     pub scope: ScopeReference,
@@ -461,14 +569,16 @@ pub struct Activity {
 /// Submit a new activity record. The store assigns
 /// `stamped_at` on commit. Reply: `ActivityAcknowledgment`
 /// carrying the slot the record landed in.
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ActivitySubmission {
     pub role: RoleName,
     pub scope: ScopeReference,
     pub reason: ScopeReason,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, Copy, PartialEq, Eq,
+)]
 pub struct ActivityAcknowledgment {
     /// The slot (sequential u64) the record was assigned.
     pub slot: u64,
@@ -477,7 +587,7 @@ pub struct ActivityAcknowledgment {
 /// Query the activity log. Limit caps how many records come
 /// back; filters narrow by role or scope. Empty filter list
 /// = "all".
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ActivityQuery {
     pub limit: u32,
     pub filters: Vec<ActivityFilter>,
@@ -495,7 +605,59 @@ pub enum ActivityFilter {
     TaskToken(TaskToken),
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+impl NotaEncode for ActivityFilter {
+    fn encode(&self, encoder: &mut Encoder) -> nota_codec::Result<()> {
+        match self {
+            Self::RoleFilter(role) => {
+                encoder.start_record("RoleFilter")?;
+                role.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::PathPrefix(path) => {
+                encoder.start_record("PathPrefix")?;
+                path.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::TaskToken(token) => {
+                encoder.start_record("TaskToken")?;
+                token.encode(encoder)?;
+                encoder.end_record()
+            }
+        }
+    }
+}
+
+impl NotaDecode for ActivityFilter {
+    fn decode(decoder: &mut Decoder<'_>) -> nota_codec::Result<Self> {
+        let head = decoder.peek_record_head()?;
+        match head.as_str() {
+            "RoleFilter" => {
+                decoder.expect_record_head("RoleFilter")?;
+                let role = RoleName::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::RoleFilter(role))
+            }
+            "PathPrefix" => {
+                decoder.expect_record_head("PathPrefix")?;
+                let path = WirePath::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::PathPrefix(path))
+            }
+            "TaskToken" => {
+                decoder.expect_record_head("TaskToken")?;
+                let token = TaskToken::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::TaskToken(token))
+            }
+            other => Err(nota_codec::Error::UnknownKindForVerb {
+                verb: "ActivityFilter",
+                got: other.to_string(),
+            }),
+        }
+    }
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ActivityList {
     /// Ordered most-recent first.
     pub records: Vec<Activity>,
@@ -503,7 +665,9 @@ pub struct ActivityList {
 
 // ─── Mind Memory Identity ─────────────────────────────────
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaTransparent, Debug, Clone, PartialEq, Eq, Hash,
+)]
 pub struct StableItemId(String);
 
 impl StableItemId {
@@ -516,7 +680,9 @@ impl StableItemId {
     }
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaTransparent, Debug, Clone, PartialEq, Eq, Hash,
+)]
 pub struct DisplayId(String);
 
 impl DisplayId {
@@ -529,7 +695,9 @@ impl DisplayId {
     }
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaTransparent, Debug, Clone, PartialEq, Eq, Hash,
+)]
 pub struct ExternalAlias(String);
 
 impl ExternalAlias {
@@ -542,7 +710,9 @@ impl ExternalAlias {
     }
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaTransparent, Debug, Clone, PartialEq, Eq, Hash,
+)]
 pub struct BeadsToken(String);
 
 impl BeadsToken {
@@ -555,7 +725,9 @@ impl BeadsToken {
     }
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaTransparent, Debug, Clone, PartialEq, Eq, Hash,
+)]
 pub struct OperationId(String);
 
 impl OperationId {
@@ -568,7 +740,9 @@ impl OperationId {
     }
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaTransparent, Debug, Clone, PartialEq, Eq, Hash,
+)]
 pub struct ActorName(String);
 
 impl ActorName {
@@ -581,7 +755,18 @@ impl ActorName {
     }
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    Archive,
+    RkyvSerialize,
+    RkyvDeserialize,
+    NotaTransparent,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+)]
 pub struct EventSeq(u64);
 
 impl EventSeq {
@@ -594,7 +779,18 @@ impl EventSeq {
     }
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    Archive,
+    RkyvSerialize,
+    RkyvDeserialize,
+    NotaTransparent,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+)]
 pub struct QueryLimit(u16);
 
 impl QueryLimit {
@@ -609,7 +805,7 @@ impl QueryLimit {
 
 // ─── Mind Memory Text ─────────────────────────────────────
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaTransparent, Debug, Clone, PartialEq, Eq)]
 pub struct Title(String);
 
 impl Title {
@@ -622,7 +818,7 @@ impl Title {
     }
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaTransparent, Debug, Clone, PartialEq, Eq)]
 pub struct TextBody(String);
 
 impl TextBody {
@@ -635,7 +831,9 @@ impl TextBody {
     }
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaTransparent, Debug, Clone, PartialEq, Eq, Hash,
+)]
 pub struct ReportPath(String);
 
 impl ReportPath {
@@ -648,7 +846,9 @@ impl ReportPath {
     }
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaTransparent, Debug, Clone, PartialEq, Eq, Hash,
+)]
 pub struct ReferencePath(String);
 
 impl ReferencePath {
@@ -661,7 +861,9 @@ impl ReferencePath {
     }
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaTransparent, Debug, Clone, PartialEq, Eq, Hash,
+)]
 pub struct CommitHash(String);
 
 impl CommitHash {
@@ -676,7 +878,9 @@ impl CommitHash {
 
 // ─── Mind Memory Domain ───────────────────────────────────
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaEnum, Debug, Clone, Copy, PartialEq, Eq, Hash,
+)]
 pub enum ItemKind {
     Task,
     Defect,
@@ -686,7 +890,9 @@ pub enum ItemKind {
     Handoff,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaEnum, Debug, Clone, Copy, PartialEq, Eq, Hash,
+)]
 pub enum ItemStatus {
     Open,
     InProgress,
@@ -695,7 +901,9 @@ pub enum ItemStatus {
     Deferred,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaEnum, Debug, Clone, Copy, PartialEq, Eq, Hash,
+)]
 pub enum ItemPriority {
     Critical,
     High,
@@ -704,7 +912,9 @@ pub enum ItemPriority {
     Backlog,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaEnum, Debug, Clone, Copy, PartialEq, Eq, Hash,
+)]
 pub enum EdgeKind {
     DependsOn,
     ParentOf,
@@ -722,6 +932,58 @@ pub enum ItemReference {
     Alias(ExternalAlias),
 }
 
+impl NotaEncode for ItemReference {
+    fn encode(&self, encoder: &mut Encoder) -> nota_codec::Result<()> {
+        match self {
+            Self::Stable(id) => {
+                encoder.start_record("Stable")?;
+                id.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::Display(id) => {
+                encoder.start_record("Display")?;
+                id.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::Alias(alias) => {
+                encoder.start_record("Alias")?;
+                alias.encode(encoder)?;
+                encoder.end_record()
+            }
+        }
+    }
+}
+
+impl NotaDecode for ItemReference {
+    fn decode(decoder: &mut Decoder<'_>) -> nota_codec::Result<Self> {
+        let head = decoder.peek_record_head()?;
+        match head.as_str() {
+            "Stable" => {
+                decoder.expect_record_head("Stable")?;
+                let id = StableItemId::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::Stable(id))
+            }
+            "Display" => {
+                decoder.expect_record_head("Display")?;
+                let id = DisplayId::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::Display(id))
+            }
+            "Alias" => {
+                decoder.expect_record_head("Alias")?;
+                let alias = ExternalAlias::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::Alias(alias))
+            }
+            other => Err(nota_codec::Error::UnknownKindForVerb {
+                verb: "ItemReference",
+                got: other.to_string(),
+            }),
+        }
+    }
+}
+
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ExternalReference {
     Report(ReportPath),
@@ -730,10 +992,114 @@ pub enum ExternalReference {
     File(ReferencePath),
 }
 
+impl NotaEncode for ExternalReference {
+    fn encode(&self, encoder: &mut Encoder) -> nota_codec::Result<()> {
+        match self {
+            Self::Report(path) => {
+                encoder.start_record("Report")?;
+                path.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::GitCommit(commit) => {
+                encoder.start_record("GitCommit")?;
+                commit.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::BeadsTask(task) => {
+                encoder.start_record("BeadsTask")?;
+                task.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::File(path) => {
+                encoder.start_record("File")?;
+                path.encode(encoder)?;
+                encoder.end_record()
+            }
+        }
+    }
+}
+
+impl NotaDecode for ExternalReference {
+    fn decode(decoder: &mut Decoder<'_>) -> nota_codec::Result<Self> {
+        let head = decoder.peek_record_head()?;
+        match head.as_str() {
+            "Report" => {
+                decoder.expect_record_head("Report")?;
+                let path = ReportPath::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::Report(path))
+            }
+            "GitCommit" => {
+                decoder.expect_record_head("GitCommit")?;
+                let commit = CommitHash::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::GitCommit(commit))
+            }
+            "BeadsTask" => {
+                decoder.expect_record_head("BeadsTask")?;
+                let task = BeadsToken::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::BeadsTask(task))
+            }
+            "File" => {
+                decoder.expect_record_head("File")?;
+                let path = ReferencePath::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::File(path))
+            }
+            other => Err(nota_codec::Error::UnknownKindForVerb {
+                verb: "ExternalReference",
+                got: other.to_string(),
+            }),
+        }
+    }
+}
+
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LinkTarget {
     Item(ItemReference),
     External(ExternalReference),
+}
+
+impl NotaEncode for LinkTarget {
+    fn encode(&self, encoder: &mut Encoder) -> nota_codec::Result<()> {
+        match self {
+            Self::Item(item) => {
+                encoder.start_record("Item")?;
+                item.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::External(external) => {
+                encoder.start_record("External")?;
+                external.encode(encoder)?;
+                encoder.end_record()
+            }
+        }
+    }
+}
+
+impl NotaDecode for LinkTarget {
+    fn decode(decoder: &mut Decoder<'_>) -> nota_codec::Result<Self> {
+        let head = decoder.peek_record_head()?;
+        match head.as_str() {
+            "Item" => {
+                decoder.expect_record_head("Item")?;
+                let item = ItemReference::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::Item(item))
+            }
+            "External" => {
+                decoder.expect_record_head("External")?;
+                let external = ExternalReference::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::External(external))
+            }
+            other => Err(nota_codec::Error::UnknownKindForVerb {
+                verb: "LinkTarget",
+                got: other.to_string(),
+            }),
+        }
+    }
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -742,9 +1108,50 @@ pub enum EdgeTarget {
     External(ExternalReference),
 }
 
+impl NotaEncode for EdgeTarget {
+    fn encode(&self, encoder: &mut Encoder) -> nota_codec::Result<()> {
+        match self {
+            Self::Item(item) => {
+                encoder.start_record("Item")?;
+                item.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::External(external) => {
+                encoder.start_record("External")?;
+                external.encode(encoder)?;
+                encoder.end_record()
+            }
+        }
+    }
+}
+
+impl NotaDecode for EdgeTarget {
+    fn decode(decoder: &mut Decoder<'_>) -> nota_codec::Result<Self> {
+        let head = decoder.peek_record_head()?;
+        match head.as_str() {
+            "Item" => {
+                decoder.expect_record_head("Item")?;
+                let item = StableItemId::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::Item(item))
+            }
+            "External" => {
+                decoder.expect_record_head("External")?;
+                let external = ExternalReference::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::External(external))
+            }
+            other => Err(nota_codec::Error::UnknownKindForVerb {
+                verb: "EdgeTarget",
+                got: other.to_string(),
+            }),
+        }
+    }
+}
+
 // ─── Mind Memory Requests ─────────────────────────────────
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct Opening {
     pub kind: ItemKind,
     pub priority: ItemPriority,
@@ -752,13 +1159,13 @@ pub struct Opening {
     pub body: TextBody,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct NoteSubmission {
     pub item: ItemReference,
     pub body: TextBody,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct Link {
     pub source: ItemReference,
     pub kind: EdgeKind,
@@ -766,20 +1173,20 @@ pub struct Link {
     pub body: Option<TextBody>,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct StatusChange {
     pub item: ItemReference,
     pub status: ItemStatus,
     pub body: Option<TextBody>,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct AliasAssignment {
     pub item: ItemReference,
     pub alias: ExternalAlias,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct Query {
     pub kind: QueryKind,
     pub limit: QueryLimit,
@@ -797,9 +1204,108 @@ pub enum QueryKind {
     ByAlias(ExternalAlias),
 }
 
+impl NotaEncode for QueryKind {
+    fn encode(&self, encoder: &mut Encoder) -> nota_codec::Result<()> {
+        match self {
+            Self::Ready => {
+                encoder.start_record("Ready")?;
+                encoder.end_record()
+            }
+            Self::Blocked => {
+                encoder.start_record("Blocked")?;
+                encoder.end_record()
+            }
+            Self::Open => {
+                encoder.start_record("Open")?;
+                encoder.end_record()
+            }
+            Self::RecentEvents => {
+                encoder.start_record("RecentEvents")?;
+                encoder.end_record()
+            }
+            Self::ByItem(item) => {
+                encoder.start_record("ByItem")?;
+                item.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::ByKind(kind) => {
+                encoder.start_record("ByKind")?;
+                kind.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::ByStatus(status) => {
+                encoder.start_record("ByStatus")?;
+                status.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::ByAlias(alias) => {
+                encoder.start_record("ByAlias")?;
+                alias.encode(encoder)?;
+                encoder.end_record()
+            }
+        }
+    }
+}
+
+impl NotaDecode for QueryKind {
+    fn decode(decoder: &mut Decoder<'_>) -> nota_codec::Result<Self> {
+        let head = decoder.peek_record_head()?;
+        match head.as_str() {
+            "Ready" => {
+                decoder.expect_record_head("Ready")?;
+                decoder.expect_record_end()?;
+                Ok(Self::Ready)
+            }
+            "Blocked" => {
+                decoder.expect_record_head("Blocked")?;
+                decoder.expect_record_end()?;
+                Ok(Self::Blocked)
+            }
+            "Open" => {
+                decoder.expect_record_head("Open")?;
+                decoder.expect_record_end()?;
+                Ok(Self::Open)
+            }
+            "RecentEvents" => {
+                decoder.expect_record_head("RecentEvents")?;
+                decoder.expect_record_end()?;
+                Ok(Self::RecentEvents)
+            }
+            "ByItem" => {
+                decoder.expect_record_head("ByItem")?;
+                let item = ItemReference::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::ByItem(item))
+            }
+            "ByKind" => {
+                decoder.expect_record_head("ByKind")?;
+                let kind = ItemKind::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::ByKind(kind))
+            }
+            "ByStatus" => {
+                decoder.expect_record_head("ByStatus")?;
+                let status = ItemStatus::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::ByStatus(status))
+            }
+            "ByAlias" => {
+                decoder.expect_record_head("ByAlias")?;
+                let alias = ExternalAlias::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::ByAlias(alias))
+            }
+            other => Err(nota_codec::Error::UnknownKindForVerb {
+                verb: "QueryKind",
+                got: other.to_string(),
+            }),
+        }
+    }
+}
+
 // ─── Mind Memory Projections ──────────────────────────────
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct Item {
     pub id: StableItemId,
     pub display_id: DisplayId,
@@ -811,7 +1317,7 @@ pub struct Item {
     pub body: TextBody,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct Note {
     pub event: EventSeq,
     pub item: StableItemId,
@@ -819,7 +1325,7 @@ pub struct Note {
     pub body: TextBody,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct Edge {
     pub event: EventSeq,
     pub source: StableItemId,
@@ -830,32 +1336,32 @@ pub struct Edge {
 
 // ─── Mind Memory Events ───────────────────────────────────
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct EventHeader {
     pub event: EventSeq,
     pub operation: OperationId,
     pub actor: ActorName,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ItemOpenedEvent {
     pub header: EventHeader,
     pub item: Item,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct NoteAddedEvent {
     pub header: EventHeader,
     pub note: Note,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct EdgeAddedEvent {
     pub header: EventHeader,
     pub edge: Edge,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct StatusChangedEvent {
     pub header: EventHeader,
     pub item: StableItemId,
@@ -863,14 +1369,14 @@ pub struct StatusChangedEvent {
     pub body: Option<TextBody>,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct AliasAddedEvent {
     pub header: EventHeader,
     pub item: StableItemId,
     pub alias: ExternalAlias,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaSum, Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     ItemOpened(ItemOpenedEvent),
     NoteAdded(NoteAddedEvent),
@@ -881,32 +1387,32 @@ pub enum Event {
 
 // ─── Mind Memory Replies ──────────────────────────────────
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct OpeningReceipt {
     pub event: ItemOpenedEvent,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct NoteReceipt {
     pub event: NoteAddedEvent,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct LinkReceipt {
     pub event: EdgeAddedEvent,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct StatusReceipt {
     pub event: StatusChangedEvent,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct AliasReceipt {
     pub event: AliasAddedEvent,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct View {
     pub items: Vec<Item>,
     pub edges: Vec<Edge>,
@@ -914,12 +1420,12 @@ pub struct View {
     pub events: Vec<Event>,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct Rejection {
     pub reason: RejectionReason,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaEnum, Debug, Clone, PartialEq, Eq)]
 pub enum RejectionReason {
     UnknownItem,
     DuplicateAlias,
@@ -931,7 +1437,9 @@ pub enum RejectionReason {
 
 // ─── Channel Choreography ─────────────────────────────────
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaTransparent, Debug, Clone, PartialEq, Eq, Hash,
+)]
 pub struct AdjudicationRequestId(String);
 
 impl AdjudicationRequestId {
@@ -950,7 +1458,50 @@ pub enum ChannelEndpoint {
     External(ConnectionClass),
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+impl NotaEncode for ChannelEndpoint {
+    fn encode(&self, encoder: &mut Encoder) -> nota_codec::Result<()> {
+        match self {
+            Self::Internal(component) => {
+                encoder.start_record("Internal")?;
+                component.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::External(connection_class) => {
+                encoder.start_record("External")?;
+                connection_class.encode(encoder)?;
+                encoder.end_record()
+            }
+        }
+    }
+}
+
+impl NotaDecode for ChannelEndpoint {
+    fn decode(decoder: &mut Decoder<'_>) -> nota_codec::Result<Self> {
+        let head = decoder.peek_record_head()?;
+        match head.as_str() {
+            "Internal" => {
+                decoder.expect_record_head("Internal")?;
+                let component = ComponentName::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::Internal(component))
+            }
+            "External" => {
+                decoder.expect_record_head("External")?;
+                let connection_class = ConnectionClass::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::External(connection_class))
+            }
+            other => Err(nota_codec::Error::UnknownKindForVerb {
+                verb: "ChannelEndpoint",
+                got: other.to_string(),
+            }),
+        }
+    }
+}
+
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaEnum, Debug, Clone, Copy, PartialEq, Eq, Hash,
+)]
 pub enum ChannelMessageKind {
     MessageSubmission,
     InboxQuery,
@@ -975,7 +1526,55 @@ pub enum ChannelDuration {
     TimeBound(TimestampNanos),
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+impl NotaEncode for ChannelDuration {
+    fn encode(&self, encoder: &mut Encoder) -> nota_codec::Result<()> {
+        match self {
+            Self::OneShot => {
+                encoder.start_record("OneShot")?;
+                encoder.end_record()
+            }
+            Self::Permanent => {
+                encoder.start_record("Permanent")?;
+                encoder.end_record()
+            }
+            Self::TimeBound(timestamp) => {
+                encoder.start_record("TimeBound")?;
+                timestamp.encode(encoder)?;
+                encoder.end_record()
+            }
+        }
+    }
+}
+
+impl NotaDecode for ChannelDuration {
+    fn decode(decoder: &mut Decoder<'_>) -> nota_codec::Result<Self> {
+        let head = decoder.peek_record_head()?;
+        match head.as_str() {
+            "OneShot" => {
+                decoder.expect_record_head("OneShot")?;
+                decoder.expect_record_end()?;
+                Ok(Self::OneShot)
+            }
+            "Permanent" => {
+                decoder.expect_record_head("Permanent")?;
+                decoder.expect_record_end()?;
+                Ok(Self::Permanent)
+            }
+            "TimeBound" => {
+                decoder.expect_record_head("TimeBound")?;
+                let timestamp = TimestampNanos::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::TimeBound(timestamp))
+            }
+            other => Err(nota_codec::Error::UnknownKindForVerb {
+                verb: "ChannelDuration",
+                got: other.to_string(),
+            }),
+        }
+    }
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct AdjudicationRequest {
     pub request: AdjudicationRequestId,
     pub origin: MessageOrigin,
@@ -984,12 +1583,12 @@ pub struct AdjudicationRequest {
     pub body_summary: TextBody,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct AdjudicationReceipt {
     pub request: AdjudicationRequestId,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ChannelGrant {
     pub source: ChannelEndpoint,
     pub destination: ChannelEndpoint,
@@ -997,25 +1596,25 @@ pub struct ChannelGrant {
     pub duration: ChannelDuration,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ChannelExtend {
     pub channel: ChannelId,
     pub duration: ChannelDuration,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ChannelRetract {
     pub channel: ChannelId,
     pub reason: TextBody,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct AdjudicationDeny {
     pub request: AdjudicationRequestId,
     pub reason: TextBody,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ChannelList {
     pub filters: Vec<ChannelFilter>,
 }
@@ -1027,17 +1626,69 @@ pub enum ChannelFilter {
     Kind(ChannelMessageKind),
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+impl NotaEncode for ChannelFilter {
+    fn encode(&self, encoder: &mut Encoder) -> nota_codec::Result<()> {
+        match self {
+            Self::Source(endpoint) => {
+                encoder.start_record("Source")?;
+                endpoint.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::Destination(endpoint) => {
+                encoder.start_record("Destination")?;
+                endpoint.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::Kind(kind) => {
+                encoder.start_record("Kind")?;
+                kind.encode(encoder)?;
+                encoder.end_record()
+            }
+        }
+    }
+}
+
+impl NotaDecode for ChannelFilter {
+    fn decode(decoder: &mut Decoder<'_>) -> nota_codec::Result<Self> {
+        let head = decoder.peek_record_head()?;
+        match head.as_str() {
+            "Source" => {
+                decoder.expect_record_head("Source")?;
+                let endpoint = ChannelEndpoint::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::Source(endpoint))
+            }
+            "Destination" => {
+                decoder.expect_record_head("Destination")?;
+                let endpoint = ChannelEndpoint::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::Destination(endpoint))
+            }
+            "Kind" => {
+                decoder.expect_record_head("Kind")?;
+                let kind = ChannelMessageKind::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::Kind(kind))
+            }
+            other => Err(nota_codec::Error::UnknownKindForVerb {
+                verb: "ChannelFilter",
+                got: other.to_string(),
+            }),
+        }
+    }
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ChannelReceipt {
     pub channel: ChannelId,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct AdjudicationDenyReceipt {
     pub request: AdjudicationRequestId,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ChannelView {
     pub channel: ChannelId,
     pub source: ChannelEndpoint,
@@ -1046,7 +1697,7 @@ pub struct ChannelView {
     pub duration: ChannelDuration,
 }
 
-#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct ChannelListView {
     pub channels: Vec<ChannelView>,
 }

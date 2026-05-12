@@ -6,6 +6,7 @@
 //! proves the macro-emitted type round-trips through a
 //! length-prefixed Frame.
 
+use nota_codec::{Decoder, Encoder, Error as NotaError, NotaDecode, NotaEncode};
 use signal_core::{FrameBody, Reply, Request, SemaVerb};
 use signal_persona_auth::{ChannelId, ComponentName, ConnectionClass, MessageOrigin};
 use signal_persona_mind::{
@@ -48,6 +49,20 @@ fn round_trip_reply(reply: MindReply) -> MindReply {
         FrameBody::Reply(Reply::Operation(reply)) => reply,
         other => panic!("expected reply operation, got {other:?}"),
     }
+}
+
+fn round_trip_nota<T>(value: T, expected: &str)
+where
+    T: NotaEncode + NotaDecode + PartialEq + std::fmt::Debug,
+{
+    let mut encoder = Encoder::new();
+    value.encode(&mut encoder).expect("encode nota text");
+    let encoded = encoder.into_string();
+    assert_eq!(encoded, expected);
+
+    let mut decoder = Decoder::new(&encoded);
+    let recovered = T::decode(&mut decoder).expect("decode nota text");
+    assert_eq!(recovered, value);
 }
 
 fn sample_path() -> WirePath {
@@ -214,6 +229,18 @@ fn role_claim_with_paths_round_trips() {
     });
     let decoded = round_trip_request(request.clone());
     assert_eq!(decoded, request);
+}
+
+#[test]
+fn role_claim_request_round_trips_through_nota_text() {
+    round_trip_nota(
+        MindRequest::RoleClaim(RoleClaim {
+            role: RoleName::Designer,
+            scopes: vec![sample_path_scope(), sample_task_scope()],
+            reason: sample_reason(),
+        }),
+        "(RoleClaim Designer [(Path \"/git/github.com/LiGoldragon/signal-persona-mind/src/lib.rs\") (Task primary-f99)] \"design-cascade per /93\")",
+    );
 }
 
 #[test]
@@ -433,6 +460,17 @@ fn every_query_kind_round_trips() {
 }
 
 #[test]
+fn query_request_round_trips_through_nota_text() {
+    round_trip_nota(
+        MindRequest::Query(Query {
+            kind: QueryKind::Ready,
+            limit: QueryLimit::new(25),
+        }),
+        "(Query (Ready) 25)",
+    );
+}
+
+#[test]
 fn every_edge_kind_round_trips_as_a_link_request() {
     let fixture = MemoryFixture::new();
     let kinds = vec![
@@ -529,6 +567,22 @@ fn channel_choreography_requests_round_trip() {
     }
 }
 
+#[test]
+fn channel_grant_request_round_trips_through_nota_text() {
+    round_trip_nota(
+        MindRequest::ChannelGrant(ChannelGrant {
+            source: sample_external_owner_endpoint(),
+            destination: sample_internal_endpoint(ComponentName::Router),
+            kinds: vec![
+                ChannelMessageKind::MessageSubmission,
+                ChannelMessageKind::InboxQuery,
+            ],
+            duration: ChannelDuration::Permanent,
+        }),
+        "(ChannelGrant (External (Owner)) (Internal Router) [MessageSubmission InboxQuery] (Permanent))",
+    );
+}
+
 // ─── Reply variants ───────────────────────────────────────
 
 #[test]
@@ -539,6 +593,17 @@ fn claim_acceptance_round_trips() {
     });
     let decoded = round_trip_reply(reply.clone());
     assert_eq!(decoded, reply);
+}
+
+#[test]
+fn claim_acceptance_reply_round_trips_through_nota_text() {
+    round_trip_nota(
+        MindReply::ClaimAcceptance(ClaimAcceptance {
+            role: RoleName::Designer,
+            scopes: vec![sample_task_scope()],
+        }),
+        "(ClaimAcceptance Designer [(Task primary-f99)])",
+    );
 }
 
 #[test]
@@ -779,6 +844,19 @@ fn wire_path_requires_absolute_normalized_path() {
 
     let root = WirePath::from_absolute_path("/").expect("root path");
     assert_eq!(root.as_str(), "/");
+}
+
+#[test]
+fn wire_path_nota_decode_uses_boundary_validation() {
+    let mut decoder = Decoder::new("\"relative/path\"");
+    let error = WirePath::decode(&mut decoder).expect_err("relative path must fail validation");
+    match error {
+        NotaError::Validation { type_name, message } => {
+            assert_eq!(type_name, "WirePath");
+            assert!(message.contains("absolute"), "message was: {message}");
+        }
+        other => panic!("expected validation error, got {other:?}"),
+    }
 }
 
 #[test]

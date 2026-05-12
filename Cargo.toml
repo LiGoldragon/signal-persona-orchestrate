@@ -15,6 +15,7 @@ path = "src/lib.rs"
 [dependencies]
 signal-core         = { git = "https://github.com/LiGoldragon/signal-core.git" }
 signal-persona-auth = { git = "https://github.com/LiGoldragon/signal-persona-auth.git" }
+nota-codec          = { git = "https://github.com/LiGoldragon/nota-codec.git", branch = "main" }
 rkyv                = { version = "0.8", default-features = false, features = ["std", "bytecheck", "little_endian", "pointer_width_32", "unaligned"] }
 thiserror           = "2"
 
