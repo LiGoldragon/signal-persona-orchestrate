@@ -274,7 +274,7 @@ Missing tests for the next wave:
 
 | Test | Proves |
 |---|---|
-| `nota_projection_round_trips_role_claim` | text projection uses this contract. |
+| `nota_projection_round_trips_role_claim` | contract owns the text codec round-trip for this record. |
 | `nota_projection_rejects_cli_only_command` | no second command language. |
 | `request_payload_cannot_carry_timestamp` | store mints time. |
 | `request_payload_cannot_carry_event_sequence` | store mints sequence. |
