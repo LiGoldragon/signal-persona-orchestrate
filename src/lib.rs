@@ -17,6 +17,10 @@
 //!   optionally filtered by role or scope.
 //! - **Memory/work graph** — append typed item, note, edge,
 //!   alias, and status events, then query the derived view.
+//! - **Typed mind graph substrate** — submit/query/subscribe to
+//!   closed Thought and Relation records (`Observation`, `Memory`,
+//!   `Belief`, `Goal`, `Claim`, `Decision`, `Reference`) per
+//!   designer/152.
 //!
 //! The channel is **request/reply** (every operation has a
 //! typed reply). Subscription mode is a future extension —
@@ -35,6 +39,9 @@ use signal_core::signal_channel;
 use signal_persona_auth::{ChannelId, ComponentName, ConnectionClass, MessageOrigin};
 use std::fmt;
 use std::str::FromStr;
+
+mod graph;
+pub use graph::*;
 
 // ─── Error ────────────────────────────────────────────────
 
@@ -1503,6 +1510,7 @@ impl NotaDecode for ChannelEndpoint {
     Archive, RkyvSerialize, RkyvDeserialize, NotaEnum, Debug, Clone, Copy, PartialEq, Eq, Hash,
 )]
 pub enum ChannelMessageKind {
+    MessageIngressSubmission,
     MessageSubmission,
     InboxQuery,
     FocusObservation,
@@ -1623,6 +1631,12 @@ pub struct ChannelList {
     Archive, RkyvSerialize, RkyvDeserialize, NotaEnum, Debug, Clone, Copy, PartialEq, Eq, Hash,
 )]
 pub enum MindOperationKind {
+    SubmitThought,
+    SubmitRelation,
+    QueryThoughts,
+    QueryRelations,
+    SubscribeThoughts,
+    SubscribeRelations,
     RoleClaim,
     RoleRelease,
     RoleHandoff,
@@ -1730,6 +1744,12 @@ pub struct ChannelListView {
 
 signal_channel! {
     request MindRequest {
+        SubmitThought(SubmitThought),
+        SubmitRelation(SubmitRelation),
+        QueryThoughts(QueryThoughts),
+        QueryRelations(QueryRelations),
+        SubscribeThoughts(SubscribeThoughts),
+        SubscribeRelations(SubscribeRelations),
         RoleClaim(RoleClaim),
         RoleRelease(RoleRelease),
         RoleHandoff(RoleHandoff),
@@ -1750,6 +1770,12 @@ signal_channel! {
         ChannelList(ChannelList),
     }
     reply MindReply {
+        ThoughtCommitted(ThoughtCommitted),
+        RelationCommitted(RelationCommitted),
+        ThoughtList(ThoughtList),
+        RelationList(RelationList),
+        SubscriptionAccepted(SubscriptionAccepted),
+        SubscriptionEvent(SubscriptionEvent),
         ClaimAcceptance(ClaimAcceptance),
         ClaimRejection(ClaimRejection),
         ReleaseAcknowledgment(ReleaseAcknowledgment),
@@ -1769,12 +1795,19 @@ signal_channel! {
         ChannelReceipt(ChannelReceipt),
         AdjudicationDenyReceipt(AdjudicationDenyReceipt),
         ChannelListView(ChannelListView),
+        MindRequestUnimplemented(MindRequestUnimplemented),
     }
 }
 
 impl MindRequest {
     pub fn operation_kind(&self) -> MindOperationKind {
         match self {
+            Self::SubmitThought(_) => MindOperationKind::SubmitThought,
+            Self::SubmitRelation(_) => MindOperationKind::SubmitRelation,
+            Self::QueryThoughts(_) => MindOperationKind::QueryThoughts,
+            Self::QueryRelations(_) => MindOperationKind::QueryRelations,
+            Self::SubscribeThoughts(_) => MindOperationKind::SubscribeThoughts,
+            Self::SubscribeRelations(_) => MindOperationKind::SubscribeRelations,
             Self::RoleClaim(_) => MindOperationKind::RoleClaim,
             Self::RoleRelease(_) => MindOperationKind::RoleRelease,
             Self::RoleHandoff(_) => MindOperationKind::RoleHandoff,

@@ -58,6 +58,12 @@ The channel is one `signal_channel!` invocation in `src/lib.rs`.
 ```rust
 signal_channel! {
     request MindRequest {
+        SubmitThought(SubmitThought),
+        SubmitRelation(SubmitRelation),
+        QueryThoughts(QueryThoughts),
+        QueryRelations(QueryRelations),
+        SubscribeThoughts(SubscribeThoughts),
+        SubscribeRelations(SubscribeRelations),
         RoleClaim(RoleClaim),
         RoleRelease(RoleRelease),
         RoleHandoff(RoleHandoff),
@@ -78,6 +84,12 @@ signal_channel! {
         ChannelList(ChannelList),
     }
     reply MindReply {
+        ThoughtCommitted(ThoughtCommitted),
+        RelationCommitted(RelationCommitted),
+        ThoughtList(ThoughtList),
+        RelationList(RelationList),
+        SubscriptionAccepted(SubscriptionAccepted),
+        SubscriptionEvent(SubscriptionEvent),
         ClaimAcceptance(ClaimAcceptance),
         ClaimRejection(ClaimRejection),
         ReleaseAcknowledgment(ReleaseAcknowledgment),
@@ -97,6 +109,7 @@ signal_channel! {
         ChannelReceipt(ChannelReceipt),
         AdjudicationDenyReceipt(AdjudicationDenyReceipt),
         ChannelListView(ChannelListView),
+        MindRequestUnimplemented(MindRequestUnimplemented),
     }
 }
 ```
@@ -119,6 +132,28 @@ These records replace the lock-file claim/release/handoff protocol. Lock files
 are outside this contract and outside the `persona-mind` implementation target.
 They belong only to the temporary workspace workflow until agents switch to
 `mind`.
+
+### 3.1.5 Typed mind graph substrate
+
+| Request | Reply |
+|---|---|
+| `SubmitThought` | `ThoughtCommitted` |
+| `SubmitRelation` | `RelationCommitted` |
+| `QueryThoughts` | `ThoughtList` |
+| `QueryRelations` | `RelationList` |
+| `SubscribeThoughts` | `SubscriptionAccepted`, then `SubscriptionEvent` |
+| `SubscribeRelations` | `SubscriptionAccepted`, then `SubscriptionEvent` |
+
+The graph surface is the first typed substrate for replacing BEADS and later
+rendering reports/architecture/skills from mind state. The closed node family
+is `ThoughtKind`: `Observation`, `Memory`, `Belief`, `Goal`, `Claim`,
+`Decision`, `Reference`. The closed edge family is `RelationKind`:
+`Implements`, `Realizes`, `Requires`, `Supports`, `Refutes`, `Supersedes`,
+`Authored`, `References`, `Decides`, `Considered`, `Belongs`.
+
+`RecordId` and `RelationId` are opaque contract values. `persona-mind` owns
+their minting, collision handling, durable indices, and short display-id
+projection. The contract owns only the typed records that cross the channel.
 
 ### 3.2 Activity
 
@@ -190,6 +225,8 @@ The contract validates boundary strings before they become wire values.
 | `ScopeReason` | non-empty single-line text. |
 | `TimestampNanos` | store-supplied timestamp type; request records do not mint it. |
 | `ActorName` | event/caller identity after infrastructure resolution. |
+| `RecordId` | opaque durable thought identifier minted by `persona-mind`. |
+| `RelationId` | opaque durable relation identifier minted by `persona-mind`. |
 | `StableItemId` | internal work graph identity. |
 | `DisplayId` | short human identity for work graph references. |
 | `ExternalAlias` | imported or external identifiers. |

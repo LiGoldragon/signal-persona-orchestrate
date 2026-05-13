@@ -33,15 +33,23 @@ If your change adds a new request or reply variant, edit
   `WirePath` and `TaskToken` newtypes.
 - `ScopeReason` (provisional `String` newtype).
 - `TimestampNanos` (store-supplied; never agent-supplied).
+- The typed mind graph substrate: `ThoughtKind` / `ThoughtBody`,
+  `RelationKind`, `Thought`, `Relation`, `RecordId`, `RelationId`,
+  thought/relation filters, subscription records, and graph
+  commit/list replies.
 - The closed `MindRequest` enum (`RoleClaim`,
   `RoleRelease`, `RoleHandoff`, `RoleObservation`,
-  `ActivitySubmission`, `ActivityQuery`, `Opening`,
+  `ActivitySubmission`, `ActivityQuery`, `SubmitThought`,
+  `SubmitRelation`, `QueryThoughts`, `QueryRelations`,
+  `SubscribeThoughts`, `SubscribeRelations`, `Opening`,
   `NoteSubmission`, `Link`, `StatusChange`,
   `AliasAssignment`, `Query`).
 - The closed `MindReply` enum (`ClaimAcceptance`,
   `ClaimRejection`, `ReleaseAcknowledgment`,
   `HandoffAcceptance`, `HandoffRejection`, `RoleSnapshot`,
-  `ActivityAcknowledgment`, `ActivityList`,
+  `ActivityAcknowledgment`, `ActivityList`, `ThoughtCommitted`,
+  `RelationCommitted`, `ThoughtList`, `RelationList`,
+  `SubscriptionAccepted`, `SubscriptionEvent`,
   `OpeningReceipt`, `NoteReceipt`, `LinkReceipt`,
   `StatusReceipt`, `AliasReceipt`, `View`, `Rejection`).
 - The mind memory/work record vocabulary: `Item`, `Note`, `Edge`,

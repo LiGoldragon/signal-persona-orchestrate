@@ -9,23 +9,7 @@
 use nota_codec::{Decoder, Encoder, Error as NotaError, NotaDecode, NotaEncode};
 use signal_core::{FrameBody, Reply, Request, SemaVerb};
 use signal_persona_auth::{ChannelId, ComponentName, ConnectionClass, MessageOrigin};
-use signal_persona_mind::{
-    Activity, ActivityAcknowledgment, ActivityFilter, ActivityList, ActivityQuery,
-    ActivitySubmission, ActorName, AdjudicationDeny, AdjudicationDenyReceipt, AdjudicationReceipt,
-    AdjudicationRequest, AdjudicationRequestId, AliasAddedEvent, AliasAssignment, AliasReceipt,
-    BeadsToken, ChannelDuration, ChannelEndpoint, ChannelExtend, ChannelFilter, ChannelGrant,
-    ChannelList, ChannelListView, ChannelMessageKind, ChannelReceipt, ChannelRetract, ChannelView,
-    ClaimAcceptance, ClaimEntry, ClaimRejection, CommitHash, DisplayId, Edge, EdgeAddedEvent,
-    EdgeKind, EdgeTarget, Event, EventHeader, EventSeq, ExternalAlias, ExternalReference, Frame,
-    HandoffAcceptance, HandoffRejection, HandoffRejectionReason, Item, ItemKind, ItemOpenedEvent,
-    ItemPriority, ItemReference, ItemStatus, Link, LinkReceipt, LinkTarget, MindOperationKind,
-    MindReply, MindRequest, Note, NoteAddedEvent, NoteReceipt, NoteSubmission, Opening,
-    OpeningReceipt, OperationId, Query, QueryKind, QueryLimit, ReferencePath, Rejection,
-    RejectionReason, ReleaseAcknowledgment, ReportPath, RoleClaim, RoleHandoff, RoleName,
-    RoleObservation, RoleRelease, RoleSnapshot, RoleStatus, ScopeConflict, ScopeReason,
-    ScopeReference, StableItemId, StatusChange, StatusChangedEvent, StatusReceipt, TaskToken,
-    TextBody, TimestampNanos, Title, View, WirePath,
-};
+use signal_persona_mind::*;
 
 // ─── Helpers ──────────────────────────────────────────────
 
@@ -93,6 +77,22 @@ fn sample_adjudication_request() -> AdjudicationRequestId {
 
 fn sample_channel() -> ChannelId {
     ChannelId::new("channel-aab")
+}
+
+fn sample_record() -> RecordId {
+    RecordId::new("rec-aab")
+}
+
+fn sample_relation() -> RelationId {
+    RelationId::new("rel-aab")
+}
+
+fn sample_engine() -> signal_persona_auth::EngineId {
+    signal_persona_auth::EngineId::new("engine-aab")
+}
+
+fn sample_actor() -> ActorName {
+    ActorName::new("operator")
 }
 
 fn sample_internal_endpoint(component: ComponentName) -> ChannelEndpoint {
@@ -217,6 +217,269 @@ impl MemoryFixture {
         let decoded = round_trip_request(request.clone());
         assert_eq!(decoded, request);
     }
+}
+
+struct MindGraphFixture {
+    record: RecordId,
+    relation: RelationId,
+    actor: ActorName,
+    occurred_at: TimestampNanos,
+}
+
+impl MindGraphFixture {
+    fn new() -> Self {
+        Self {
+            record: sample_record(),
+            relation: sample_relation(),
+            actor: sample_actor(),
+            occurred_at: TimestampNanos::new(1_790_000_000_000_000_000),
+        }
+    }
+
+    fn observation_body(&self) -> ThoughtBody {
+        ThoughtBody::Observation(ObservationBody {
+            summary: ObservationSummary::ComponentReady(ComponentReady {
+                component: ComponentName::Mind,
+                engine: sample_engine(),
+            }),
+            detail: Some(TextBody::new("mind graph contract ready")),
+            location: None,
+        })
+    }
+
+    fn thought(&self) -> Thought {
+        Thought {
+            id: self.record.clone(),
+            kind: ThoughtKind::Observation,
+            body: self.observation_body(),
+            author: self.actor.clone(),
+            occurred_at: self.occurred_at,
+        }
+    }
+
+    fn relation(&self) -> Relation {
+        Relation {
+            id: self.relation.clone(),
+            kind: RelationKind::Authored,
+            source: RecordId::new("identity-aab"),
+            target: self.record.clone(),
+            author: self.actor.clone(),
+            occurred_at: self.occurred_at,
+            note: Some(TextBody::new("operator authored the thought")),
+        }
+    }
+
+    fn decision_body(&self) -> ThoughtBody {
+        ThoughtBody::Decision(DecisionBody {
+            question: TextBody::new("Should the mind graph land in the contract first?"),
+            alternatives: vec![
+                Alternative {
+                    id: AlternativeId::new("contract-first"),
+                    description: TextBody::new("Land signal-persona-mind first."),
+                    pros: vec![TextBody::new("consumers compile against one vocabulary")],
+                    cons: vec![TextBody::new("persona-mind waits for the pin")],
+                },
+                Alternative {
+                    id: AlternativeId::new("consumer-first"),
+                    description: TextBody::new("Prototype in persona-mind first."),
+                    pros: vec![TextBody::new("fast local reducer feedback")],
+                    cons: vec![TextBody::new("risks a parallel vocabulary")],
+                },
+            ],
+            chosen: AlternativeId::new("contract-first"),
+            criteria: vec![TextBody::new("contracts choreograph parallel work")],
+            rationale: TextBody::new("The typed vocabulary must be the shared boundary."),
+        })
+    }
+
+    fn reference_body(&self) -> ThoughtBody {
+        ThoughtBody::Reference(ReferenceBody {
+            target: ReferenceTarget::Identity(IdentityReference::Component(ComponentIdentity {
+                engine: sample_engine(),
+                component: ComponentName::Mind,
+            })),
+            sense: Some(TextBody::new("the component whose graph owns this record")),
+        })
+    }
+}
+
+// ─── Mind graph contract variants ─────────────────────────
+
+#[test]
+fn every_thought_kind_round_trips_through_nota_text() {
+    let cases = [
+        (ThoughtKind::Observation, "Observation"),
+        (ThoughtKind::Memory, "Memory"),
+        (ThoughtKind::Belief, "Belief"),
+        (ThoughtKind::Goal, "Goal"),
+        (ThoughtKind::Claim, "Claim"),
+        (ThoughtKind::Decision, "Decision"),
+        (ThoughtKind::Reference, "Reference"),
+    ];
+
+    for (kind, expected) in cases {
+        round_trip_nota(kind, expected);
+    }
+}
+
+#[test]
+fn every_relation_kind_round_trips_through_nota_text() {
+    let cases = [
+        (RelationKind::Implements, "Implements"),
+        (RelationKind::Realizes, "Realizes"),
+        (RelationKind::Requires, "Requires"),
+        (RelationKind::Supports, "Supports"),
+        (RelationKind::Refutes, "Refutes"),
+        (RelationKind::Supersedes, "Supersedes"),
+        (RelationKind::Authored, "Authored"),
+        (RelationKind::References, "References"),
+        (RelationKind::Decides, "Decides"),
+        (RelationKind::Considered, "Considered"),
+        (RelationKind::Belongs, "Belongs"),
+    ];
+
+    for (kind, expected) in cases {
+        round_trip_nota(kind, expected);
+    }
+}
+
+#[test]
+fn submit_thought_request_round_trips() {
+    let fixture = MindGraphFixture::new();
+    let request = MindRequest::SubmitThought(SubmitThought {
+        kind: ThoughtKind::Observation,
+        body: fixture.observation_body(),
+    });
+
+    assert_eq!(round_trip_request(request.clone()), request);
+}
+
+#[test]
+fn submit_relation_request_round_trips() {
+    let request = MindRequest::SubmitRelation(SubmitRelation {
+        kind: RelationKind::Implements,
+        source: RecordId::new("claim-aab"),
+        target: RecordId::new("goal-aab"),
+        note: Some(TextBody::new("claim commits work toward the goal")),
+    });
+
+    assert_eq!(round_trip_request(request.clone()), request);
+}
+
+#[test]
+fn query_thoughts_request_round_trips_with_composite_filter() {
+    let request = MindRequest::QueryThoughts(QueryThoughts {
+        filter: ThoughtFilter::Composite(CompositeThoughtFilter {
+            kinds: vec![ThoughtKind::Goal, ThoughtKind::Claim],
+            author: Some(sample_actor()),
+            time_range: None,
+            goal: None,
+            memory: None,
+        }),
+        limit: 32,
+    });
+
+    assert_eq!(round_trip_request(request.clone()), request);
+}
+
+#[test]
+fn query_relations_request_round_trips_with_source_filter() {
+    let request = MindRequest::QueryRelations(QueryRelations {
+        filter: RelationFilter::BySource(ByRelationSource {
+            source: RecordId::new("goal-aab"),
+        }),
+        limit: 16,
+    });
+
+    assert_eq!(round_trip_request(request.clone()), request);
+}
+
+#[test]
+fn subscribe_requests_round_trip() {
+    let thoughts = MindRequest::SubscribeThoughts(SubscribeThoughts {
+        filter: ThoughtFilter::InMemory(InMemory {
+            memory: RecordId::new("memory-aab"),
+        }),
+    });
+    let relations = MindRequest::SubscribeRelations(SubscribeRelations {
+        filter: RelationFilter::ByTarget(ByRelationTarget {
+            target: RecordId::new("goal-aab"),
+        }),
+    });
+
+    assert_eq!(round_trip_request(thoughts.clone()), thoughts);
+    assert_eq!(round_trip_request(relations.clone()), relations);
+}
+
+#[test]
+fn thought_and_relation_replies_round_trip() {
+    let fixture = MindGraphFixture::new();
+    let replies = vec![
+        MindReply::ThoughtCommitted(ThoughtCommitted {
+            record: fixture.record.clone(),
+            display: DisplayId::new("aab"),
+            occurred_at: fixture.occurred_at,
+        }),
+        MindReply::RelationCommitted(RelationCommitted {
+            relation: fixture.relation.clone(),
+            occurred_at: fixture.occurred_at,
+        }),
+        MindReply::ThoughtList(ThoughtList {
+            thoughts: vec![fixture.thought()],
+            has_more: false,
+        }),
+        MindReply::RelationList(RelationList {
+            relations: vec![fixture.relation()],
+            has_more: false,
+        }),
+    ];
+
+    for reply in replies {
+        assert_eq!(round_trip_reply(reply.clone()), reply);
+    }
+}
+
+#[test]
+fn subscription_replies_round_trip() {
+    let fixture = MindGraphFixture::new();
+    let accepted = MindReply::SubscriptionAccepted(SubscriptionAccepted {
+        subscription: SubscriptionId::new("sub-aab"),
+        initial_snapshot: vec![
+            MindSnapshot::Thought(fixture.thought()),
+            MindSnapshot::Relation(fixture.relation()),
+        ],
+    });
+    let event = MindReply::SubscriptionEvent(SubscriptionEvent {
+        subscription: SubscriptionId::new("sub-aab"),
+        delta: MindDelta::ThoughtCommitted(Thought {
+            body: fixture.decision_body(),
+            kind: ThoughtKind::Decision,
+            ..fixture.thought()
+        }),
+    });
+
+    assert_eq!(round_trip_reply(accepted.clone()), accepted);
+    assert_eq!(round_trip_reply(event.clone()), event);
+}
+
+#[test]
+fn reference_identity_thought_body_round_trips() {
+    let fixture = MindGraphFixture::new();
+    let request = MindRequest::SubmitThought(SubmitThought {
+        kind: ThoughtKind::Reference,
+        body: fixture.reference_body(),
+    });
+
+    assert_eq!(round_trip_request(request.clone()), request);
+}
+
+#[test]
+fn unimplemented_reply_round_trips_as_typed_reply() {
+    let reply = MindReply::MindRequestUnimplemented(MindRequestUnimplemented {
+        reason: MindUnimplementedReason::NotInPrototypeScope,
+    });
+
+    assert_eq!(round_trip_reply(reply.clone()), reply);
 }
 
 // ─── Request variants ─────────────────────────────────────
@@ -588,6 +851,56 @@ fn channel_grant_request_round_trips_through_nota_text() {
 fn mind_request_exposes_contract_owned_operation_kind() {
     let fixture = MemoryFixture::new();
     let cases = vec![
+        (
+            MindRequest::SubmitThought(SubmitThought {
+                kind: ThoughtKind::Observation,
+                body: MindGraphFixture::new().observation_body(),
+            }),
+            MindOperationKind::SubmitThought,
+        ),
+        (
+            MindRequest::SubmitRelation(SubmitRelation {
+                kind: RelationKind::Implements,
+                source: RecordId::new("claim-aab"),
+                target: RecordId::new("goal-aab"),
+                note: None,
+            }),
+            MindOperationKind::SubmitRelation,
+        ),
+        (
+            MindRequest::QueryThoughts(QueryThoughts {
+                filter: ThoughtFilter::ByKind(ByThoughtKind {
+                    kinds: vec![ThoughtKind::Goal],
+                }),
+                limit: 10,
+            }),
+            MindOperationKind::QueryThoughts,
+        ),
+        (
+            MindRequest::QueryRelations(QueryRelations {
+                filter: RelationFilter::ByKind(ByRelationKind {
+                    kinds: vec![RelationKind::Implements],
+                }),
+                limit: 10,
+            }),
+            MindOperationKind::QueryRelations,
+        ),
+        (
+            MindRequest::SubscribeThoughts(SubscribeThoughts {
+                filter: ThoughtFilter::ByAuthor(ByThoughtAuthor {
+                    author: ActorName::new("operator"),
+                }),
+            }),
+            MindOperationKind::SubscribeThoughts,
+        ),
+        (
+            MindRequest::SubscribeRelations(SubscribeRelations {
+                filter: RelationFilter::ByTarget(ByRelationTarget {
+                    target: RecordId::new("goal-aab"),
+                }),
+            }),
+            MindOperationKind::SubscribeRelations,
+        ),
         (
             MindRequest::RoleClaim(RoleClaim {
                 role: RoleName::Designer,
