@@ -169,7 +169,13 @@ The endpoint and kind vocabulary is typed:
   `External(ConnectionClass)`.
 - `ChannelMessageKind` is a closed enum for first-stack route categories such
   as message submission, inbox query, message delivery, terminal input, prompt
-  observation, adjudication, and channel grant/retract traffic.
+  observation, adjudication, and channel grant/retract traffic. **Includes
+  `MessageIngressSubmission`** — the channel kind for the
+  `Internal(Message) → Internal(Router)` structural channel that
+  `persona-message-daemon` forwards user-typed messages over. Per
+  `~/primary/reports/designer/143-prototype-readiness-gap-audit.md` §4.6, this
+  variant must be distinct from the generic delivery kinds so audit and
+  choreography can tell message ingress from other internal traffic.
 - `ChannelDuration` is `OneShot`, `Permanent`, or `TimeBound(TimestampNanos)`.
 
 ## 4 · Boundary Newtypes
@@ -235,6 +241,25 @@ consumers.
 
 Backward compatibility is handled by explicit conversion code, not by weak
 catch-all records.
+
+## 6.5 · Skeleton honesty (Unimplemented reply)
+
+Per `~/primary/reports/designer/143-prototype-readiness-gap-audit.md` §4.3,
+`MindReply` carries a typed `MindRequestUnimplemented(MindUnimplementedReason)`
+variant. Prototype-time mind decodes every `MindRequest` variant; for choreography
+ops or other variants whose behavior is not yet built (e.g., the
+`ChannelGrant` / `ChannelRetract` / `AdjudicationDeny` family until the
+choreography policy engine lands), mind replies
+`MindRequestUnimplemented(NotInPrototypeScope)` — a typed answer, not a panic
+and not a parse error.
+
+```text
+MindUnimplementedReason
+  | NotInPrototypeScope                  -- variant exists in contract; behavior not yet built
+  | ChoreographyPolicyMissing            -- specific reason for the choreography family
+  | DependencyMissing(DependencyKind)
+  | ResourceUnavailable(ResourceKind)
+```
 
 ## 7 · Constraints
 
