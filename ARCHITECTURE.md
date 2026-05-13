@@ -153,9 +153,9 @@ is `ThoughtKind`: `Observation`, `Memory`, `Belief`, `Goal`, `Claim`,
 
 `RelationKind` owns the domain/range validator for this graph vocabulary. The
 validator is contract code, not runtime folklore: producers and consumers call
-the same table before accepting a relation. `Authored` validates the thought
-kind boundary as `Reference -> any`; the stricter "identity Reference" body
-rule is a later body-level validator.
+the same table before accepting a relation. The full endpoint validator also
+checks relation-specific body constraints; `Authored` requires a source Thought
+whose body is `Reference(Identity)`, not just any Reference.
 
 `RecordId` and `RelationId` are opaque contract values. `persona-mind` owns
 their minting, collision handling, durable indices, and short display-id

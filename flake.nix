@@ -41,6 +41,10 @@
             inherit cargoArtifacts;
             cargoTestExtraArgs = "--test round_trip relation_kind_rejects_wrong_domain";
           });
+          test-authored-rejects-non-identity-reference-source = craneLib.cargoTest (commonArgs // {
+            inherit cargoArtifacts;
+            cargoTestExtraArgs = "--test round_trip authored_relation_rejects_non_identity_reference_source";
+          });
           test-doc = craneLib.cargoTest (commonArgs // {
             inherit cargoArtifacts;
             cargoTestExtraArgs = "--doc";

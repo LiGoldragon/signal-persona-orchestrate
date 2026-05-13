@@ -257,6 +257,31 @@ impl MindGraphFixture {
         }
     }
 
+    fn identity_reference_thought(&self) -> Thought {
+        Thought {
+            id: RecordId::new("identity-aab"),
+            kind: ThoughtKind::Reference,
+            body: self.reference_body(),
+            author: self.actor.clone(),
+            occurred_at: self.occurred_at,
+        }
+    }
+
+    fn file_reference_thought(&self) -> Thought {
+        Thought {
+            id: RecordId::new("file-aab"),
+            kind: ThoughtKind::Reference,
+            body: ThoughtBody::Reference(ReferenceBody {
+                target: ReferenceTarget::File(FileReference {
+                    path: sample_path(),
+                }),
+                sense: Some(TextBody::new("a source file is not an identity")),
+            }),
+            author: self.actor.clone(),
+            occurred_at: self.occurred_at,
+        }
+    }
+
     fn relation(&self) -> Relation {
         Relation {
             id: self.relation.clone(),
@@ -438,10 +463,38 @@ fn relation_kind_rejects_wrong_domain() {
         .expect_err("Goal -> Claim cannot implement");
 
     assert_eq!(mismatch.relation, RelationKind::Implements);
+    assert_eq!(mismatch.reason, RelationKindMismatchReason::DomainRange);
     assert_eq!(mismatch.expected_source_kinds, vec![ThoughtKind::Claim]);
     assert_eq!(mismatch.expected_target_kinds, vec![ThoughtKind::Goal]);
     assert_eq!(mismatch.got_source_kind, ThoughtKind::Goal);
     assert_eq!(mismatch.got_target_kind, ThoughtKind::Claim);
+}
+
+#[test]
+fn authored_relation_rejects_non_identity_reference_source() {
+    let fixture = MindGraphFixture::new();
+    let source = fixture.file_reference_thought();
+    let target = fixture.thought();
+    let mismatch = RelationKind::Authored
+        .validate_endpoints(&source, &target)
+        .expect_err("Authored source must be an identity reference");
+
+    assert_eq!(mismatch.relation, RelationKind::Authored);
+    assert_eq!(
+        mismatch.reason,
+        RelationKindMismatchReason::AuthoredSourceNotIdentity
+    );
+    assert_eq!(mismatch.expected_source_kinds, vec![ThoughtKind::Reference]);
+    assert_eq!(mismatch.got_source_kind, ThoughtKind::Reference);
+    assert_eq!(mismatch.got_target_kind, ThoughtKind::Observation);
+}
+
+#[test]
+fn authored_relation_accepts_identity_reference_source() {
+    let fixture = MindGraphFixture::new();
+    RelationKind::Authored
+        .validate_endpoints(&fixture.identity_reference_thought(), &fixture.thought())
+        .expect("identity reference can author any thought");
 }
 
 #[test]

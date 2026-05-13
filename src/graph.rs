@@ -210,11 +210,32 @@ impl RelationKind {
         } else {
             Err(RelationKindMismatch {
                 relation: self,
+                reason: RelationKindMismatchReason::DomainRange,
                 expected_source_kinds,
                 expected_target_kinds,
                 got_source_kind: source,
                 got_target_kind: target,
             })
+        }
+    }
+
+    pub fn validate_endpoints(
+        self,
+        source: &Thought,
+        target: &Thought,
+    ) -> std::result::Result<(), RelationKindMismatch> {
+        self.validate_endpoint_kinds(source.kind, target.kind)?;
+        if self == Self::Authored && !source.is_identity_reference() {
+            Err(RelationKindMismatch {
+                relation: self,
+                reason: RelationKindMismatchReason::AuthoredSourceNotIdentity,
+                expected_source_kinds: vec![ThoughtKind::Reference],
+                expected_target_kinds: self.expected_target_kinds(source.kind),
+                got_source_kind: source.kind,
+                got_target_kind: target.kind,
+            })
+        } else {
+            Ok(())
         }
     }
 
@@ -250,9 +271,18 @@ impl RelationKind {
     }
 }
 
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaEnum, Debug, Clone, Copy, PartialEq, Eq, Hash,
+)]
+pub enum RelationKindMismatchReason {
+    DomainRange,
+    AuthoredSourceNotIdentity,
+}
+
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct RelationKindMismatch {
     pub relation: RelationKind,
+    pub reason: RelationKindMismatchReason,
     pub expected_source_kinds: Vec<ThoughtKind>,
     pub expected_target_kinds: Vec<ThoughtKind>,
     pub got_source_kind: ThoughtKind,
@@ -266,6 +296,12 @@ pub struct Thought {
     pub body: ThoughtBody,
     pub author: ActorName,
     pub occurred_at: TimestampNanos,
+}
+
+impl Thought {
+    pub fn is_identity_reference(&self) -> bool {
+        self.body.is_identity_reference()
+    }
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
@@ -300,6 +336,13 @@ impl ThoughtBody {
             Self::Claim(_) => ThoughtKind::Claim,
             Self::Decision(_) => ThoughtKind::Decision,
             Self::Reference(_) => ThoughtKind::Reference,
+        }
+    }
+
+    pub fn is_identity_reference(&self) -> bool {
+        match self {
+            Self::Reference(reference) => reference.is_identity(),
+            _ => false,
         }
     }
 }
@@ -599,6 +642,12 @@ pub struct Alternative {
 pub struct ReferenceBody {
     pub target: ReferenceTarget,
     pub sense: Option<TextBody>,
+}
+
+impl ReferenceBody {
+    pub fn is_identity(&self) -> bool {
+        matches!(&self.target, ReferenceTarget::Identity(_))
+    }
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaSum, Debug, Clone, PartialEq, Eq)]
