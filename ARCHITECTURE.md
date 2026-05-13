@@ -294,8 +294,8 @@ and not a parse error.
 MindUnimplementedReason
   | NotInPrototypeScope                  -- variant exists in contract; behavior not yet built
   | ChoreographyPolicyMissing            -- specific reason for the choreography family
-  | DependencyMissing(DependencyKind)
-  | ResourceUnavailable(ResourceKind)
+  | DependencyMissing(DependencyKind)     -- Router, Harness, Terminal, DurableStore
+  | ResourceUnavailable(ResourceKind)     -- SocketPath, StateDirectory, Database
 ```
 
 ## 7 · Constraints
@@ -333,6 +333,8 @@ Existing tests in `tests/round_trip.rs` cover:
 - every `QueryKind`;
 - every `EdgeKind`;
 - channel choreography request/reply variants;
+- typed unimplemented reason variants;
+- `MessageIngressSubmission` distinct from generic `MessageSubmission`;
 - scope variants;
 - external references;
 - boundary validation, including `WirePath` NOTA decode rejection.

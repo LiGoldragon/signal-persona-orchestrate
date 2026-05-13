@@ -475,11 +475,30 @@ fn reference_identity_thought_body_round_trips() {
 
 #[test]
 fn unimplemented_reply_round_trips_as_typed_reply() {
-    let reply = MindReply::MindRequestUnimplemented(MindRequestUnimplemented {
-        reason: MindUnimplementedReason::NotInPrototypeScope,
-    });
+    let cases = [
+        (
+            MindUnimplementedReason::NotInPrototypeScope,
+            "(MindRequestUnimplemented (NotInPrototypeScope))",
+        ),
+        (
+            MindUnimplementedReason::ChoreographyPolicyMissing,
+            "(MindRequestUnimplemented (ChoreographyPolicyMissing))",
+        ),
+        (
+            MindUnimplementedReason::DependencyMissing(DependencyKind::Router),
+            "(MindRequestUnimplemented (DependencyMissing Router))",
+        ),
+        (
+            MindUnimplementedReason::ResourceUnavailable(ResourceKind::Database),
+            "(MindRequestUnimplemented (ResourceUnavailable Database))",
+        ),
+    ];
 
-    assert_eq!(round_trip_reply(reply.clone()), reply);
+    for (reason, expected_text) in cases {
+        let reply = MindReply::MindRequestUnimplemented(MindRequestUnimplemented { reason });
+        assert_eq!(round_trip_reply(reply.clone()), reply);
+        round_trip_nota(reply, expected_text);
+    }
 }
 
 // ─── Request variants ─────────────────────────────────────
@@ -845,6 +864,19 @@ fn channel_grant_request_round_trips_through_nota_text() {
         }),
         "(ChannelGrant (External (Owner)) (Internal Router) [MessageSubmission InboxQuery] (Permanent))",
     );
+}
+
+#[test]
+fn message_ingress_kind_is_distinct_from_generic_message_submission() {
+    assert_ne!(
+        ChannelMessageKind::MessageIngressSubmission,
+        ChannelMessageKind::MessageSubmission
+    );
+    round_trip_nota(
+        ChannelMessageKind::MessageIngressSubmission,
+        "MessageIngressSubmission",
+    );
+    round_trip_nota(ChannelMessageKind::MessageSubmission, "MessageSubmission");
 }
 
 #[test]

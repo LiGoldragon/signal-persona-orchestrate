@@ -1,4 +1,6 @@
-use nota_codec::{NotaEnum, NotaRecord, NotaSum, NotaTransparent};
+use nota_codec::{
+    Decoder, Encoder, NotaDecode, NotaEncode, NotaEnum, NotaRecord, NotaSum, NotaTransparent,
+};
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use signal_persona_auth::{ChannelId, ComponentName, EngineId, HostName, UnixUserId};
 
@@ -765,8 +767,85 @@ pub struct MindRequestUnimplemented {
 #[derive(
     Archive, RkyvSerialize, RkyvDeserialize, NotaEnum, Debug, Clone, Copy, PartialEq, Eq, Hash,
 )]
+pub enum DependencyKind {
+    Router,
+    Harness,
+    Terminal,
+    DurableStore,
+}
+
+#[derive(
+    Archive, RkyvSerialize, RkyvDeserialize, NotaEnum, Debug, Clone, Copy, PartialEq, Eq, Hash,
+)]
+pub enum ResourceKind {
+    SocketPath,
+    StateDirectory,
+    Database,
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MindUnimplementedReason {
     NotInPrototypeScope,
     ChoreographyPolicyMissing,
-    DependencyMissing,
+    DependencyMissing(DependencyKind),
+    ResourceUnavailable(ResourceKind),
+}
+
+impl NotaEncode for MindUnimplementedReason {
+    fn encode(&self, encoder: &mut Encoder) -> nota_codec::Result<()> {
+        match self {
+            Self::NotInPrototypeScope => {
+                encoder.start_record("NotInPrototypeScope")?;
+                encoder.end_record()
+            }
+            Self::ChoreographyPolicyMissing => {
+                encoder.start_record("ChoreographyPolicyMissing")?;
+                encoder.end_record()
+            }
+            Self::DependencyMissing(dependency) => {
+                encoder.start_record("DependencyMissing")?;
+                dependency.encode(encoder)?;
+                encoder.end_record()
+            }
+            Self::ResourceUnavailable(resource) => {
+                encoder.start_record("ResourceUnavailable")?;
+                resource.encode(encoder)?;
+                encoder.end_record()
+            }
+        }
+    }
+}
+
+impl NotaDecode for MindUnimplementedReason {
+    fn decode(decoder: &mut Decoder<'_>) -> nota_codec::Result<Self> {
+        let head = decoder.peek_record_head()?;
+        match head.as_str() {
+            "NotInPrototypeScope" => {
+                decoder.expect_record_head("NotInPrototypeScope")?;
+                decoder.expect_record_end()?;
+                Ok(Self::NotInPrototypeScope)
+            }
+            "ChoreographyPolicyMissing" => {
+                decoder.expect_record_head("ChoreographyPolicyMissing")?;
+                decoder.expect_record_end()?;
+                Ok(Self::ChoreographyPolicyMissing)
+            }
+            "DependencyMissing" => {
+                decoder.expect_record_head("DependencyMissing")?;
+                let dependency = DependencyKind::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::DependencyMissing(dependency))
+            }
+            "ResourceUnavailable" => {
+                decoder.expect_record_head("ResourceUnavailable")?;
+                let resource = ResourceKind::decode(decoder)?;
+                decoder.expect_record_end()?;
+                Ok(Self::ResourceUnavailable(resource))
+            }
+            other => Err(nota_codec::Error::UnknownKindForVerb {
+                verb: "MindUnimplementedReason",
+                got: other.to_string(),
+            }),
+        }
+    }
 }
