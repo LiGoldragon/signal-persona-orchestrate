@@ -154,6 +154,18 @@ pub enum ThoughtKind {
     Reference,
 }
 
+impl ThoughtKind {
+    pub const ALL: [Self; 7] = [
+        Self::Observation,
+        Self::Memory,
+        Self::Belief,
+        Self::Goal,
+        Self::Claim,
+        Self::Decision,
+        Self::Reference,
+    ];
+}
+
 #[derive(
     Archive, RkyvSerialize, RkyvDeserialize, NotaEnum, Debug, Clone, Copy, PartialEq, Eq, Hash,
 )]
@@ -169,6 +181,82 @@ pub enum RelationKind {
     Decides,
     Considered,
     Belongs,
+}
+
+impl RelationKind {
+    pub const ALL: [Self; 11] = [
+        Self::Implements,
+        Self::Realizes,
+        Self::Requires,
+        Self::Supports,
+        Self::Refutes,
+        Self::Supersedes,
+        Self::Authored,
+        Self::References,
+        Self::Decides,
+        Self::Considered,
+        Self::Belongs,
+    ];
+
+    pub fn validate_endpoint_kinds(
+        self,
+        source: ThoughtKind,
+        target: ThoughtKind,
+    ) -> std::result::Result<(), RelationKindMismatch> {
+        let expected_source_kinds = self.expected_source_kinds();
+        let expected_target_kinds = self.expected_target_kinds(source);
+        if expected_source_kinds.contains(&source) && expected_target_kinds.contains(&target) {
+            Ok(())
+        } else {
+            Err(RelationKindMismatch {
+                relation: self,
+                expected_source_kinds,
+                expected_target_kinds,
+                got_source_kind: source,
+                got_target_kind: target,
+            })
+        }
+    }
+
+    pub fn expected_source_kinds(self) -> Vec<ThoughtKind> {
+        match self {
+            Self::Implements => vec![ThoughtKind::Claim],
+            Self::Realizes => vec![ThoughtKind::Observation],
+            Self::Requires => vec![ThoughtKind::Goal, ThoughtKind::Claim],
+            Self::Supports | Self::Refutes => vec![ThoughtKind::Observation, ThoughtKind::Belief],
+            Self::Supersedes | Self::References | Self::Belongs => ThoughtKind::ALL.to_vec(),
+            Self::Authored => vec![ThoughtKind::Reference],
+            Self::Decides | Self::Considered => vec![ThoughtKind::Decision],
+        }
+    }
+
+    pub fn expected_target_kinds(self, source: ThoughtKind) -> Vec<ThoughtKind> {
+        match self {
+            Self::Implements => vec![ThoughtKind::Goal],
+            Self::Realizes => vec![ThoughtKind::Claim],
+            Self::Requires => match source {
+                ThoughtKind::Goal => vec![ThoughtKind::Goal],
+                ThoughtKind::Claim => vec![ThoughtKind::Claim],
+                _ => vec![ThoughtKind::Goal, ThoughtKind::Claim],
+            },
+            Self::Supports | Self::Refutes => vec![ThoughtKind::Belief],
+            Self::Supersedes => vec![source],
+            Self::Authored => ThoughtKind::ALL.to_vec(),
+            Self::References => vec![ThoughtKind::Reference],
+            Self::Decides => vec![ThoughtKind::Goal],
+            Self::Considered => vec![ThoughtKind::Goal, ThoughtKind::Belief],
+            Self::Belongs => vec![ThoughtKind::Memory, ThoughtKind::Goal],
+        }
+    }
+}
+
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
+pub struct RelationKindMismatch {
+    pub relation: RelationKind,
+    pub expected_source_kinds: Vec<ThoughtKind>,
+    pub expected_target_kinds: Vec<ThoughtKind>,
+    pub got_source_kind: ThoughtKind,
+    pub got_target_kind: ThoughtKind,
 }
 
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]

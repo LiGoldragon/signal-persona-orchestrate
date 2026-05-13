@@ -33,6 +33,14 @@
             inherit cargoArtifacts;
             cargoTestExtraArgs = "--test round_trip";
           });
+          test-relation-kind-domain-table-covers-every-relation-kind = craneLib.cargoTest (commonArgs // {
+            inherit cargoArtifacts;
+            cargoTestExtraArgs = "--test round_trip relation_kind_domain_table_covers_every_relation_kind";
+          });
+          test-relation-kind-rejects-wrong-domain = craneLib.cargoTest (commonArgs // {
+            inherit cargoArtifacts;
+            cargoTestExtraArgs = "--test round_trip relation_kind_rejects_wrong_domain";
+          });
           test-doc = craneLib.cargoTest (commonArgs // {
             inherit cargoArtifacts;
             cargoTestExtraArgs = "--doc";

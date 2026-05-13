@@ -151,6 +151,12 @@ is `ThoughtKind`: `Observation`, `Memory`, `Belief`, `Goal`, `Claim`,
 `Implements`, `Realizes`, `Requires`, `Supports`, `Refutes`, `Supersedes`,
 `Authored`, `References`, `Decides`, `Considered`, `Belongs`.
 
+`RelationKind` owns the domain/range validator for this graph vocabulary. The
+validator is contract code, not runtime folklore: producers and consumers call
+the same table before accepting a relation. `Authored` validates the thought
+kind boundary as `Reference -> any`; the stricter "identity Reference" body
+rule is a later body-level validator.
+
 `RecordId` and `RelationId` are opaque contract values. `persona-mind` owns
 their minting, collision handling, durable indices, and short display-id
 projection. The contract owns only the typed records that cross the channel.
@@ -339,6 +345,7 @@ Existing tests in `tests/round_trip.rs` cover:
 - external references;
 - boundary validation, including `WirePath` NOTA decode rejection.
 - workspace role coverage.
+- relation-kind domain/range validation and table coverage.
 
 Additional architecture guards still worth adding:
 

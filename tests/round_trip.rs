@@ -344,6 +344,107 @@ fn every_relation_kind_round_trips_through_nota_text() {
 }
 
 #[test]
+fn relation_kind_domain_table_covers_every_relation_kind() {
+    let valid_cases = [
+        (
+            RelationKind::Implements,
+            ThoughtKind::Claim,
+            ThoughtKind::Goal,
+        ),
+        (
+            RelationKind::Realizes,
+            ThoughtKind::Observation,
+            ThoughtKind::Claim,
+        ),
+        (RelationKind::Requires, ThoughtKind::Goal, ThoughtKind::Goal),
+        (
+            RelationKind::Requires,
+            ThoughtKind::Claim,
+            ThoughtKind::Claim,
+        ),
+        (
+            RelationKind::Supports,
+            ThoughtKind::Observation,
+            ThoughtKind::Belief,
+        ),
+        (
+            RelationKind::Supports,
+            ThoughtKind::Belief,
+            ThoughtKind::Belief,
+        ),
+        (
+            RelationKind::Refutes,
+            ThoughtKind::Observation,
+            ThoughtKind::Belief,
+        ),
+        (
+            RelationKind::Refutes,
+            ThoughtKind::Belief,
+            ThoughtKind::Belief,
+        ),
+        (
+            RelationKind::Supersedes,
+            ThoughtKind::Decision,
+            ThoughtKind::Decision,
+        ),
+        (
+            RelationKind::Authored,
+            ThoughtKind::Reference,
+            ThoughtKind::Observation,
+        ),
+        (
+            RelationKind::References,
+            ThoughtKind::Belief,
+            ThoughtKind::Reference,
+        ),
+        (
+            RelationKind::Decides,
+            ThoughtKind::Decision,
+            ThoughtKind::Goal,
+        ),
+        (
+            RelationKind::Considered,
+            ThoughtKind::Decision,
+            ThoughtKind::Belief,
+        ),
+        (
+            RelationKind::Belongs,
+            ThoughtKind::Observation,
+            ThoughtKind::Memory,
+        ),
+        (RelationKind::Belongs, ThoughtKind::Claim, ThoughtKind::Goal),
+    ];
+
+    for relation in RelationKind::ALL {
+        assert!(
+            valid_cases
+                .iter()
+                .any(|(candidate, _, _)| *candidate == relation),
+            "{relation:?} must have at least one valid witness case",
+        );
+    }
+
+    for (relation, source, target) in valid_cases {
+        relation
+            .validate_endpoint_kinds(source, target)
+            .unwrap_or_else(|mismatch| panic!("unexpected mismatch: {mismatch:?}"));
+    }
+}
+
+#[test]
+fn relation_kind_rejects_wrong_domain() {
+    let mismatch = RelationKind::Implements
+        .validate_endpoint_kinds(ThoughtKind::Goal, ThoughtKind::Claim)
+        .expect_err("Goal -> Claim cannot implement");
+
+    assert_eq!(mismatch.relation, RelationKind::Implements);
+    assert_eq!(mismatch.expected_source_kinds, vec![ThoughtKind::Claim]);
+    assert_eq!(mismatch.expected_target_kinds, vec![ThoughtKind::Goal]);
+    assert_eq!(mismatch.got_source_kind, ThoughtKind::Goal);
+    assert_eq!(mismatch.got_target_kind, ThoughtKind::Claim);
+}
+
+#[test]
 fn submit_thought_request_round_trips() {
     let fixture = MindGraphFixture::new();
     let request = MindRequest::SubmitThought(SubmitThought {
