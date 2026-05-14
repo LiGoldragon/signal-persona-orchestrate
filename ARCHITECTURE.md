@@ -21,6 +21,12 @@ This repo owns records, validation newtypes, rkyv round trips, and channel
 shape. It does not own the CLI binary, actors, database, storage tables,
 transport lifecycle, or lock-file migration.
 
+It also owns the mapping from each `MindRequest` variant to the `SemaVerb`
+that frames it. Generic `Request::assert(payload)` helpers are too
+permissive for component contracts; callers use `MindRequest::sema_verb()`
+so graph creation, graph queries, subscriptions, role release, and channel
+retraction cannot silently travel as `Assert`.
+
 ```mermaid
 flowchart LR
     cli[mind CLI] --> request[MindRequest]
@@ -116,6 +122,16 @@ signal_channel! {
 
 Closed enums are intentional. There is no `Unknown` escape hatch. New
 operations are schema changes coordinated through this contract.
+
+The request enum exposes two contract-owned discriminants:
+
+- `operation_kind()` names the domain operation for audit and UI surfaces.
+- `sema_verb()` names the database verb used in the `signal-core::Request`
+  envelope.
+
+The second mapping belongs here because this contract owns the request
+vocabulary. Runtime components execute the mapped verb; they do not infer it
+from strings or default every payload to `Assert`.
 
 ## 3 · Record Families
 

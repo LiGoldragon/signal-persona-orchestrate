@@ -35,7 +35,7 @@ use nota_codec::{
     NotaTryTransparent,
 };
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
-use signal_core::signal_channel;
+use signal_core::{SemaVerb, signal_channel};
 use signal_persona_auth::{ChannelId, ComponentName, ConnectionClass, MessageOrigin};
 use std::fmt;
 use std::str::FromStr;
@@ -1826,6 +1826,35 @@ impl MindRequest {
             Self::ChannelRetract(_) => MindOperationKind::ChannelRetract,
             Self::AdjudicationDeny(_) => MindOperationKind::AdjudicationDeny,
             Self::ChannelList(_) => MindOperationKind::ChannelList,
+        }
+    }
+
+    pub fn sema_verb(&self) -> SemaVerb {
+        match self {
+            Self::SubmitThought(_) => SemaVerb::Assert,
+            Self::SubmitRelation(_) => SemaVerb::Assert,
+            Self::QueryThoughts(_) => SemaVerb::Match,
+            Self::QueryRelations(_) => SemaVerb::Match,
+            Self::SubscribeThoughts(_) => SemaVerb::Subscribe,
+            Self::SubscribeRelations(_) => SemaVerb::Subscribe,
+            Self::RoleClaim(_) => SemaVerb::Assert,
+            Self::RoleRelease(_) => SemaVerb::Retract,
+            Self::RoleHandoff(_) => SemaVerb::Mutate,
+            Self::RoleObservation(_) => SemaVerb::Match,
+            Self::ActivitySubmission(_) => SemaVerb::Assert,
+            Self::ActivityQuery(_) => SemaVerb::Match,
+            Self::Opening(_) => SemaVerb::Assert,
+            Self::NoteSubmission(_) => SemaVerb::Assert,
+            Self::Link(_) => SemaVerb::Assert,
+            Self::StatusChange(_) => SemaVerb::Mutate,
+            Self::AliasAssignment(_) => SemaVerb::Assert,
+            Self::Query(_) => SemaVerb::Match,
+            Self::AdjudicationRequest(_) => SemaVerb::Assert,
+            Self::ChannelGrant(_) => SemaVerb::Assert,
+            Self::ChannelExtend(_) => SemaVerb::Mutate,
+            Self::ChannelRetract(_) => SemaVerb::Retract,
+            Self::AdjudicationDeny(_) => SemaVerb::Assert,
+            Self::ChannelList(_) => SemaVerb::Match,
         }
     }
 }

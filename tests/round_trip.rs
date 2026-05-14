@@ -14,12 +14,16 @@ use signal_persona_mind::*;
 // ─── Helpers ──────────────────────────────────────────────
 
 fn round_trip_request(request: MindRequest) -> MindRequest {
-    let frame = Frame::new(FrameBody::Request(Request::assert(request)));
+    let expected_verb = request.sema_verb();
+    let frame = Frame::new(FrameBody::Request(Request::operation(
+        expected_verb,
+        request,
+    )));
     let bytes = frame.encode_length_prefixed().expect("encode");
     let decoded = Frame::decode_length_prefixed(&bytes).expect("decode");
     match decoded.into_body() {
         FrameBody::Request(Request::Operation { verb, payload }) => {
-            assert_eq!(verb, SemaVerb::Assert);
+            assert_eq!(verb, expected_verb);
             payload
         }
         other => panic!("expected request operation, got {other:?}"),
@@ -1226,6 +1230,141 @@ fn mind_request_exposes_contract_owned_operation_kind() {
 
     for (request, operation) in cases {
         assert_eq!(request.operation_kind(), operation);
+    }
+}
+
+#[test]
+fn mind_graph_request_variants_have_expected_sema_verbs() {
+    let graph = MindGraphFixture::new();
+    let cases = vec![
+        (
+            MindRequest::SubmitThought(SubmitThought {
+                kind: ThoughtKind::Observation,
+                body: graph.observation_body(),
+            }),
+            SemaVerb::Assert,
+        ),
+        (
+            MindRequest::SubmitRelation(SubmitRelation {
+                kind: RelationKind::Implements,
+                source: RecordId::new("claim-aab"),
+                target: RecordId::new("goal-aab"),
+                note: None,
+            }),
+            SemaVerb::Assert,
+        ),
+        (
+            MindRequest::QueryThoughts(QueryThoughts {
+                filter: ThoughtFilter::ByKind(ByThoughtKind {
+                    kinds: vec![ThoughtKind::Goal],
+                }),
+                limit: 10,
+            }),
+            SemaVerb::Match,
+        ),
+        (
+            MindRequest::QueryRelations(QueryRelations {
+                filter: RelationFilter::ByKind(ByRelationKind {
+                    kinds: vec![RelationKind::Implements],
+                }),
+                limit: 10,
+            }),
+            SemaVerb::Match,
+        ),
+        (
+            MindRequest::SubscribeThoughts(SubscribeThoughts {
+                filter: ThoughtFilter::ByAuthor(ByThoughtAuthor {
+                    author: ActorName::new("operator"),
+                }),
+            }),
+            SemaVerb::Subscribe,
+        ),
+        (
+            MindRequest::SubscribeRelations(SubscribeRelations {
+                filter: RelationFilter::ByTarget(ByRelationTarget {
+                    target: RecordId::new("goal-aab"),
+                }),
+            }),
+            SemaVerb::Subscribe,
+        ),
+    ];
+
+    for (request, verb) in cases {
+        assert_eq!(request.sema_verb(), verb);
+    }
+}
+
+#[test]
+fn mind_request_variants_do_not_silently_default_to_assert() {
+    let fixture = MemoryFixture::new();
+    let cases = vec![
+        (
+            MindRequest::QueryThoughts(QueryThoughts {
+                filter: ThoughtFilter::ByKind(ByThoughtKind {
+                    kinds: vec![ThoughtKind::Decision],
+                }),
+                limit: 12,
+            }),
+            SemaVerb::Match,
+        ),
+        (
+            MindRequest::SubscribeRelations(SubscribeRelations {
+                filter: RelationFilter::ByTarget(ByRelationTarget {
+                    target: RecordId::new("decision-aab"),
+                }),
+            }),
+            SemaVerb::Subscribe,
+        ),
+        (
+            MindRequest::RoleRelease(RoleRelease {
+                role: RoleName::Operator,
+            }),
+            SemaVerb::Retract,
+        ),
+        (
+            MindRequest::RoleHandoff(RoleHandoff {
+                from: RoleName::Designer,
+                to: RoleName::Operator,
+                scopes: vec![sample_path_scope()],
+                reason: sample_reason(),
+            }),
+            SemaVerb::Mutate,
+        ),
+        (
+            MindRequest::RoleObservation(RoleObservation),
+            SemaVerb::Match,
+        ),
+        (
+            MindRequest::ActivityQuery(ActivityQuery {
+                limit: 8,
+                filters: vec![ActivityFilter::RoleFilter(RoleName::Operator)],
+            }),
+            SemaVerb::Match,
+        ),
+        (
+            MindRequest::StatusChange(StatusChange {
+                item: ItemReference::Stable(fixture.item_id.clone()),
+                status: ItemStatus::InProgress,
+                body: None,
+            }),
+            SemaVerb::Mutate,
+        ),
+        (
+            MindRequest::ChannelRetract(ChannelRetract {
+                channel: sample_channel(),
+                reason: TextBody::new("retired channel"),
+            }),
+            SemaVerb::Retract,
+        ),
+        (
+            MindRequest::ChannelList(ChannelList { filters: vec![] }),
+            SemaVerb::Match,
+        ),
+    ];
+
+    for (request, verb) in cases {
+        assert_eq!(request.sema_verb(), verb);
+        assert_ne!(request.sema_verb(), SemaVerb::Assert);
     }
 }
 
