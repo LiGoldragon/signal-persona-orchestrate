@@ -21,11 +21,16 @@ This repo owns records, validation newtypes, rkyv round trips, and channel
 shape. It does not own the CLI binary, actors, database, storage tables,
 transport lifecycle, or lock-file migration.
 
-It also owns the mapping from each `MindRequest` variant to the `SemaVerb`
-that frames it. Generic `Request::assert(payload)` helpers are too
-permissive for component contracts; callers use `MindRequest::sema_verb()`
-so graph creation, graph queries, subscriptions, role release, and channel
-retraction cannot silently travel as `Assert`.
+It also owns the mapping from each `MindRequest` variant to the
+`SignalVerb` root that frames it (currently still named `SemaVerb` in
+code; rename pending per
+`~/primary/reports/designer-assistant/50-signal-core-base-verb-shape.md`
+and `~/primary/reports/designer/162-signal-verb-roots-synthesis.md`).
+Generic `Request::assert(payload)` helpers are too permissive for
+component contracts; callers use `MindRequest::sema_verb()`
+(renaming to `signal_verb()` in the same pass) so graph creation,
+graph queries, subscriptions, role release, and channel retraction
+cannot silently travel as `Assert`.
 
 ```mermaid
 flowchart LR
