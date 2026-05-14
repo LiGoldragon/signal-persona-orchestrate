@@ -50,8 +50,6 @@ stores a normalized absolute path),
 ## See also
 
 - `ARCHITECTURE.md` — channel role + boundaries
-- `~/primary/reports/operator/100-persona-mind-central-rename-plan.md`
-  — the design report grounding this contract
 - `~/primary/skills/contract-repo.md` — contract-repo
   discipline
 - `signal-core` — kernel that supplies `Frame`,

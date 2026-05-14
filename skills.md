@@ -14,8 +14,6 @@ Before changing code in this repo, read:
   contract change needs a witness test.
 - `~/primary/skills/nix-discipline.md` — flake-input rules,
   `nix flake check` is the gate.
-- `~/primary/reports/operator/100-persona-mind-central-rename-plan.md`
-  — the design report grounding this channel.
 - this repo's `ARCHITECTURE.md`.
 - the consumer's `ARCHITECTURE.md` (`persona-mind/`).
 
