@@ -15,10 +15,7 @@ use signal_persona_mind::*;
 
 fn round_trip_request(request: MindRequest) -> MindRequest {
     let expected_verb = request.signal_verb();
-    let frame = Frame::new(FrameBody::Request(Request::operation(
-        expected_verb,
-        request,
-    )));
+    let frame = Frame::new(FrameBody::Request(request.into_signal_request()));
     let bytes = frame.encode_length_prefixed().expect("encode");
     let decoded = Frame::decode_length_prefixed(&bytes).expect("decode");
     match decoded.into_body() {

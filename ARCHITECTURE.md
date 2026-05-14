@@ -22,9 +22,9 @@ shape. It does not own the CLI binary, actors, database, storage tables,
 transport lifecycle, or lock-file migration.
 
 It also owns the mapping from each `MindRequest` variant to the
-`SignalVerb` root that frames it. Generic `Request::assert(payload)`
-helpers are too permissive for component contracts; callers use
-`MindRequest::signal_verb()` so graph creation, graph queries,
+`SignalVerb` root that frames it. The `signal_channel!` declaration carries
+the root beside each request variant and emits `MindRequest::signal_verb()`,
+so graph creation, graph queries,
 subscriptions, role release, and channel retraction cannot silently
 travel as `Assert`.
 
@@ -65,30 +65,30 @@ The channel is one `signal_channel!` invocation in `src/lib.rs`.
 ```rust
 signal_channel! {
     request MindRequest {
-        SubmitThought(SubmitThought),
-        SubmitRelation(SubmitRelation),
-        QueryThoughts(QueryThoughts),
-        QueryRelations(QueryRelations),
-        SubscribeThoughts(SubscribeThoughts),
-        SubscribeRelations(SubscribeRelations),
-        RoleClaim(RoleClaim),
-        RoleRelease(RoleRelease),
-        RoleHandoff(RoleHandoff),
-        RoleObservation(RoleObservation),
-        ActivitySubmission(ActivitySubmission),
-        ActivityQuery(ActivityQuery),
-        Opening(Opening),
-        NoteSubmission(NoteSubmission),
-        Link(Link),
-        StatusChange(StatusChange),
-        AliasAssignment(AliasAssignment),
-        Query(Query),
-        AdjudicationRequest(AdjudicationRequest),
-        ChannelGrant(ChannelGrant),
-        ChannelExtend(ChannelExtend),
-        ChannelRetract(ChannelRetract),
-        AdjudicationDeny(AdjudicationDeny),
-        ChannelList(ChannelList),
+        Assert SubmitThought(SubmitThought),
+        Assert SubmitRelation(SubmitRelation),
+        Match QueryThoughts(QueryThoughts),
+        Match QueryRelations(QueryRelations),
+        Subscribe SubscribeThoughts(SubscribeThoughts),
+        Subscribe SubscribeRelations(SubscribeRelations),
+        Assert RoleClaim(RoleClaim),
+        Retract RoleRelease(RoleRelease),
+        Mutate RoleHandoff(RoleHandoff),
+        Match RoleObservation(RoleObservation),
+        Assert ActivitySubmission(ActivitySubmission),
+        Match ActivityQuery(ActivityQuery),
+        Assert Opening(Opening),
+        Assert NoteSubmission(NoteSubmission),
+        Assert Link(Link),
+        Mutate StatusChange(StatusChange),
+        Assert AliasAssignment(AliasAssignment),
+        Match Query(Query),
+        Assert AdjudicationRequest(AdjudicationRequest),
+        Assert ChannelGrant(ChannelGrant),
+        Mutate ChannelExtend(ChannelExtend),
+        Retract ChannelRetract(ChannelRetract),
+        Assert AdjudicationDeny(AdjudicationDeny),
+        Match ChannelList(ChannelList),
     }
     reply MindReply {
         ThoughtCommitted(ThoughtCommitted),
@@ -127,8 +127,9 @@ operations are schema changes coordinated through this contract.
 The request enum exposes two contract-owned discriminants:
 
 - `operation_kind()` names the domain operation for audit and UI surfaces.
-- `signal_verb()` names the operation root used in the `signal-core::Request`
-  envelope.
+- `signal_verb()` is emitted by `signal_channel!` from the root written beside
+  each request variant and names the operation root used in the
+  `signal-core::Request` envelope.
 
 The second mapping belongs here because this contract owns the request
 vocabulary. Runtime components execute the mapped verb; they do not infer it

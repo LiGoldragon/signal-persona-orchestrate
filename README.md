@@ -21,7 +21,7 @@ use signal_persona_mind::{
     Frame, MindRequest, RoleClaim, RoleName, ScopeReason,
     ScopeReference, WirePath,
 };
-use signal_core::{FrameBody, Request};
+use signal_core::FrameBody;
 
 // Designer claims a path and a task scope
 let request = MindRequest::RoleClaim(RoleClaim {
@@ -33,7 +33,7 @@ let request = MindRequest::RoleClaim(RoleClaim {
     ],
     reason: ScopeReason::from_text("rescope per /91 §3.1")?,
 });
-let frame = Frame::new(FrameBody::Request(Request::assert(request)));
+let frame = Frame::new(FrameBody::Request(request.into_signal_request()));
 let bytes = frame.encode_length_prefixed()?;
 // hand to persona-mind's CLI dispatcher
 ```

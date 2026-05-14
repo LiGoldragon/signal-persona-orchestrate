@@ -35,7 +35,7 @@ use nota_codec::{
     NotaTryTransparent,
 };
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
-use signal_core::{SignalVerb, signal_channel};
+use signal_core::signal_channel;
 use signal_persona_auth::{ChannelId, ComponentName, ConnectionClass, MessageOrigin};
 use std::fmt;
 use std::str::FromStr;
@@ -1744,30 +1744,30 @@ pub struct ChannelListView {
 
 signal_channel! {
     request MindRequest {
-        SubmitThought(SubmitThought),
-        SubmitRelation(SubmitRelation),
-        QueryThoughts(QueryThoughts),
-        QueryRelations(QueryRelations),
-        SubscribeThoughts(SubscribeThoughts),
-        SubscribeRelations(SubscribeRelations),
-        RoleClaim(RoleClaim),
-        RoleRelease(RoleRelease),
-        RoleHandoff(RoleHandoff),
-        RoleObservation(RoleObservation),
-        ActivitySubmission(ActivitySubmission),
-        ActivityQuery(ActivityQuery),
-        Opening(Opening),
-        NoteSubmission(NoteSubmission),
-        Link(Link),
-        StatusChange(StatusChange),
-        AliasAssignment(AliasAssignment),
-        Query(Query),
-        AdjudicationRequest(AdjudicationRequest),
-        ChannelGrant(ChannelGrant),
-        ChannelExtend(ChannelExtend),
-        ChannelRetract(ChannelRetract),
-        AdjudicationDeny(AdjudicationDeny),
-        ChannelList(ChannelList),
+        Assert SubmitThought(SubmitThought),
+        Assert SubmitRelation(SubmitRelation),
+        Match QueryThoughts(QueryThoughts),
+        Match QueryRelations(QueryRelations),
+        Subscribe SubscribeThoughts(SubscribeThoughts),
+        Subscribe SubscribeRelations(SubscribeRelations),
+        Assert RoleClaim(RoleClaim),
+        Retract RoleRelease(RoleRelease),
+        Mutate RoleHandoff(RoleHandoff),
+        Match RoleObservation(RoleObservation),
+        Assert ActivitySubmission(ActivitySubmission),
+        Match ActivityQuery(ActivityQuery),
+        Assert Opening(Opening),
+        Assert NoteSubmission(NoteSubmission),
+        Assert Link(Link),
+        Mutate StatusChange(StatusChange),
+        Assert AliasAssignment(AliasAssignment),
+        Match Query(Query),
+        Assert AdjudicationRequest(AdjudicationRequest),
+        Assert ChannelGrant(ChannelGrant),
+        Mutate ChannelExtend(ChannelExtend),
+        Retract ChannelRetract(ChannelRetract),
+        Assert AdjudicationDeny(AdjudicationDeny),
+        Match ChannelList(ChannelList),
     }
     reply MindReply {
         ThoughtCommitted(ThoughtCommitted),
@@ -1826,35 +1826,6 @@ impl MindRequest {
             Self::ChannelRetract(_) => MindOperationKind::ChannelRetract,
             Self::AdjudicationDeny(_) => MindOperationKind::AdjudicationDeny,
             Self::ChannelList(_) => MindOperationKind::ChannelList,
-        }
-    }
-
-    pub fn signal_verb(&self) -> SignalVerb {
-        match self {
-            Self::SubmitThought(_) => SignalVerb::Assert,
-            Self::SubmitRelation(_) => SignalVerb::Assert,
-            Self::QueryThoughts(_) => SignalVerb::Match,
-            Self::QueryRelations(_) => SignalVerb::Match,
-            Self::SubscribeThoughts(_) => SignalVerb::Subscribe,
-            Self::SubscribeRelations(_) => SignalVerb::Subscribe,
-            Self::RoleClaim(_) => SignalVerb::Assert,
-            Self::RoleRelease(_) => SignalVerb::Retract,
-            Self::RoleHandoff(_) => SignalVerb::Mutate,
-            Self::RoleObservation(_) => SignalVerb::Match,
-            Self::ActivitySubmission(_) => SignalVerb::Assert,
-            Self::ActivityQuery(_) => SignalVerb::Match,
-            Self::Opening(_) => SignalVerb::Assert,
-            Self::NoteSubmission(_) => SignalVerb::Assert,
-            Self::Link(_) => SignalVerb::Assert,
-            Self::StatusChange(_) => SignalVerb::Mutate,
-            Self::AliasAssignment(_) => SignalVerb::Assert,
-            Self::Query(_) => SignalVerb::Match,
-            Self::AdjudicationRequest(_) => SignalVerb::Assert,
-            Self::ChannelGrant(_) => SignalVerb::Assert,
-            Self::ChannelExtend(_) => SignalVerb::Mutate,
-            Self::ChannelRetract(_) => SignalVerb::Retract,
-            Self::AdjudicationDeny(_) => SignalVerb::Assert,
-            Self::ChannelList(_) => SignalVerb::Match,
         }
     }
 }
