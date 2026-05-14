@@ -22,15 +22,13 @@ shape. It does not own the CLI binary, actors, database, storage tables,
 transport lifecycle, or lock-file migration.
 
 It also owns the mapping from each `MindRequest` variant to the
-`SignalVerb` root that frames it (currently still named `SemaVerb` in
-code; rename pending per
+`SignalVerb` root that frames it, per
 `~/primary/reports/designer-assistant/50-signal-core-base-verb-shape.md`
-and `~/primary/reports/designer/162-signal-verb-roots-synthesis.md`).
+and `~/primary/reports/designer/162-signal-verb-roots-synthesis.md`.
 Generic `Request::assert(payload)` helpers are too permissive for
-component contracts; callers use `MindRequest::sema_verb()`
-(renaming to `signal_verb()` in the same pass) so graph creation,
-graph queries, subscriptions, role release, and channel retraction
-cannot silently travel as `Assert`.
+component contracts; callers use `MindRequest::signal_verb()` so graph
+creation, graph queries, subscriptions, role release, and channel
+retraction cannot silently travel as `Assert`.
 
 ```mermaid
 flowchart LR
@@ -131,7 +129,7 @@ operations are schema changes coordinated through this contract.
 The request enum exposes two contract-owned discriminants:
 
 - `operation_kind()` names the domain operation for audit and UI surfaces.
-- `sema_verb()` names the database verb used in the `signal-core::Request`
+- `signal_verb()` names the operation root used in the `signal-core::Request`
   envelope.
 
 The second mapping belongs here because this contract owns the request

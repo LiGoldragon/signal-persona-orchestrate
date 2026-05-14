@@ -45,9 +45,9 @@
             inherit cargoArtifacts;
             cargoTestExtraArgs = "--test round_trip authored_relation_rejects_non_identity_reference_source";
           });
-          test-sema-verb-mapping = craneLib.cargoTest (commonArgs // {
+          test-signal-verb-mapping = craneLib.cargoTest (commonArgs // {
             inherit cargoArtifacts;
-            cargoTestExtraArgs = "--test round_trip mind_graph_request_variants_have_expected_sema_verbs";
+            cargoTestExtraArgs = "--test round_trip mind_graph_request_variants_have_expected_signal_verbs";
           });
           test-no-silent-assert-default = craneLib.cargoTest (commonArgs // {
             inherit cargoArtifacts;

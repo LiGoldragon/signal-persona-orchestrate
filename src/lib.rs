@@ -35,7 +35,7 @@ use nota_codec::{
     NotaTryTransparent,
 };
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
-use signal_core::{SemaVerb, signal_channel};
+use signal_core::{SignalVerb, signal_channel};
 use signal_persona_auth::{ChannelId, ComponentName, ConnectionClass, MessageOrigin};
 use std::fmt;
 use std::str::FromStr;
@@ -1829,32 +1829,32 @@ impl MindRequest {
         }
     }
 
-    pub fn sema_verb(&self) -> SemaVerb {
+    pub fn signal_verb(&self) -> SignalVerb {
         match self {
-            Self::SubmitThought(_) => SemaVerb::Assert,
-            Self::SubmitRelation(_) => SemaVerb::Assert,
-            Self::QueryThoughts(_) => SemaVerb::Match,
-            Self::QueryRelations(_) => SemaVerb::Match,
-            Self::SubscribeThoughts(_) => SemaVerb::Subscribe,
-            Self::SubscribeRelations(_) => SemaVerb::Subscribe,
-            Self::RoleClaim(_) => SemaVerb::Assert,
-            Self::RoleRelease(_) => SemaVerb::Retract,
-            Self::RoleHandoff(_) => SemaVerb::Mutate,
-            Self::RoleObservation(_) => SemaVerb::Match,
-            Self::ActivitySubmission(_) => SemaVerb::Assert,
-            Self::ActivityQuery(_) => SemaVerb::Match,
-            Self::Opening(_) => SemaVerb::Assert,
-            Self::NoteSubmission(_) => SemaVerb::Assert,
-            Self::Link(_) => SemaVerb::Assert,
-            Self::StatusChange(_) => SemaVerb::Mutate,
-            Self::AliasAssignment(_) => SemaVerb::Assert,
-            Self::Query(_) => SemaVerb::Match,
-            Self::AdjudicationRequest(_) => SemaVerb::Assert,
-            Self::ChannelGrant(_) => SemaVerb::Assert,
-            Self::ChannelExtend(_) => SemaVerb::Mutate,
-            Self::ChannelRetract(_) => SemaVerb::Retract,
-            Self::AdjudicationDeny(_) => SemaVerb::Assert,
-            Self::ChannelList(_) => SemaVerb::Match,
+            Self::SubmitThought(_) => SignalVerb::Assert,
+            Self::SubmitRelation(_) => SignalVerb::Assert,
+            Self::QueryThoughts(_) => SignalVerb::Match,
+            Self::QueryRelations(_) => SignalVerb::Match,
+            Self::SubscribeThoughts(_) => SignalVerb::Subscribe,
+            Self::SubscribeRelations(_) => SignalVerb::Subscribe,
+            Self::RoleClaim(_) => SignalVerb::Assert,
+            Self::RoleRelease(_) => SignalVerb::Retract,
+            Self::RoleHandoff(_) => SignalVerb::Mutate,
+            Self::RoleObservation(_) => SignalVerb::Match,
+            Self::ActivitySubmission(_) => SignalVerb::Assert,
+            Self::ActivityQuery(_) => SignalVerb::Match,
+            Self::Opening(_) => SignalVerb::Assert,
+            Self::NoteSubmission(_) => SignalVerb::Assert,
+            Self::Link(_) => SignalVerb::Assert,
+            Self::StatusChange(_) => SignalVerb::Mutate,
+            Self::AliasAssignment(_) => SignalVerb::Assert,
+            Self::Query(_) => SignalVerb::Match,
+            Self::AdjudicationRequest(_) => SignalVerb::Assert,
+            Self::ChannelGrant(_) => SignalVerb::Assert,
+            Self::ChannelExtend(_) => SignalVerb::Mutate,
+            Self::ChannelRetract(_) => SignalVerb::Retract,
+            Self::AdjudicationDeny(_) => SignalVerb::Assert,
+            Self::ChannelList(_) => SignalVerb::Match,
         }
     }
 }

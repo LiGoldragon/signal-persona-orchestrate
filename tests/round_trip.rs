@@ -7,14 +7,14 @@
 //! length-prefixed Frame.
 
 use nota_codec::{Decoder, Encoder, Error as NotaError, NotaDecode, NotaEncode};
-use signal_core::{FrameBody, Reply, Request, SemaVerb};
+use signal_core::{FrameBody, Reply, Request, SignalVerb};
 use signal_persona_auth::{ChannelId, ComponentName, ConnectionClass, MessageOrigin};
 use signal_persona_mind::*;
 
 // ─── Helpers ──────────────────────────────────────────────
 
 fn round_trip_request(request: MindRequest) -> MindRequest {
-    let expected_verb = request.sema_verb();
+    let expected_verb = request.signal_verb();
     let frame = Frame::new(FrameBody::Request(Request::operation(
         expected_verb,
         request,
@@ -1234,7 +1234,7 @@ fn mind_request_exposes_contract_owned_operation_kind() {
 }
 
 #[test]
-fn mind_graph_request_variants_have_expected_sema_verbs() {
+fn mind_graph_request_variants_have_expected_signal_verbs() {
     let graph = MindGraphFixture::new();
     let cases = vec![
         (
@@ -1242,7 +1242,7 @@ fn mind_graph_request_variants_have_expected_sema_verbs() {
                 kind: ThoughtKind::Observation,
                 body: graph.observation_body(),
             }),
-            SemaVerb::Assert,
+            SignalVerb::Assert,
         ),
         (
             MindRequest::SubmitRelation(SubmitRelation {
@@ -1251,7 +1251,7 @@ fn mind_graph_request_variants_have_expected_sema_verbs() {
                 target: RecordId::new("goal-aab"),
                 note: None,
             }),
-            SemaVerb::Assert,
+            SignalVerb::Assert,
         ),
         (
             MindRequest::QueryThoughts(QueryThoughts {
@@ -1260,7 +1260,7 @@ fn mind_graph_request_variants_have_expected_sema_verbs() {
                 }),
                 limit: 10,
             }),
-            SemaVerb::Match,
+            SignalVerb::Match,
         ),
         (
             MindRequest::QueryRelations(QueryRelations {
@@ -1269,7 +1269,7 @@ fn mind_graph_request_variants_have_expected_sema_verbs() {
                 }),
                 limit: 10,
             }),
-            SemaVerb::Match,
+            SignalVerb::Match,
         ),
         (
             MindRequest::SubscribeThoughts(SubscribeThoughts {
@@ -1277,7 +1277,7 @@ fn mind_graph_request_variants_have_expected_sema_verbs() {
                     author: ActorName::new("operator"),
                 }),
             }),
-            SemaVerb::Subscribe,
+            SignalVerb::Subscribe,
         ),
         (
             MindRequest::SubscribeRelations(SubscribeRelations {
@@ -1285,12 +1285,12 @@ fn mind_graph_request_variants_have_expected_sema_verbs() {
                     target: RecordId::new("goal-aab"),
                 }),
             }),
-            SemaVerb::Subscribe,
+            SignalVerb::Subscribe,
         ),
     ];
 
     for (request, verb) in cases {
-        assert_eq!(request.sema_verb(), verb);
+        assert_eq!(request.signal_verb(), verb);
     }
 }
 
@@ -1305,7 +1305,7 @@ fn mind_request_variants_do_not_silently_default_to_assert() {
                 }),
                 limit: 12,
             }),
-            SemaVerb::Match,
+            SignalVerb::Match,
         ),
         (
             MindRequest::SubscribeRelations(SubscribeRelations {
@@ -1313,13 +1313,13 @@ fn mind_request_variants_do_not_silently_default_to_assert() {
                     target: RecordId::new("decision-aab"),
                 }),
             }),
-            SemaVerb::Subscribe,
+            SignalVerb::Subscribe,
         ),
         (
             MindRequest::RoleRelease(RoleRelease {
                 role: RoleName::Operator,
             }),
-            SemaVerb::Retract,
+            SignalVerb::Retract,
         ),
         (
             MindRequest::RoleHandoff(RoleHandoff {
@@ -1328,18 +1328,18 @@ fn mind_request_variants_do_not_silently_default_to_assert() {
                 scopes: vec![sample_path_scope()],
                 reason: sample_reason(),
             }),
-            SemaVerb::Mutate,
+            SignalVerb::Mutate,
         ),
         (
             MindRequest::RoleObservation(RoleObservation),
-            SemaVerb::Match,
+            SignalVerb::Match,
         ),
         (
             MindRequest::ActivityQuery(ActivityQuery {
                 limit: 8,
                 filters: vec![ActivityFilter::RoleFilter(RoleName::Operator)],
             }),
-            SemaVerb::Match,
+            SignalVerb::Match,
         ),
         (
             MindRequest::StatusChange(StatusChange {
@@ -1347,24 +1347,24 @@ fn mind_request_variants_do_not_silently_default_to_assert() {
                 status: ItemStatus::InProgress,
                 body: None,
             }),
-            SemaVerb::Mutate,
+            SignalVerb::Mutate,
         ),
         (
             MindRequest::ChannelRetract(ChannelRetract {
                 channel: sample_channel(),
                 reason: TextBody::new("retired channel"),
             }),
-            SemaVerb::Retract,
+            SignalVerb::Retract,
         ),
         (
             MindRequest::ChannelList(ChannelList { filters: vec![] }),
-            SemaVerb::Match,
+            SignalVerb::Match,
         ),
     ];
 
     for (request, verb) in cases {
-        assert_eq!(request.sema_verb(), verb);
-        assert_ne!(request.sema_verb(), SemaVerb::Assert);
+        assert_eq!(request.signal_verb(), verb);
+        assert_ne!(request.signal_verb(), SignalVerb::Assert);
     }
 }
 
