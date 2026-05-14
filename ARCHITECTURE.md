@@ -22,13 +22,11 @@ shape. It does not own the CLI binary, actors, database, storage tables,
 transport lifecycle, or lock-file migration.
 
 It also owns the mapping from each `MindRequest` variant to the
-`SignalVerb` root that frames it, per
-`~/primary/reports/designer-assistant/50-signal-core-base-verb-shape.md`
-and `~/primary/reports/designer/162-signal-verb-roots-synthesis.md`.
-Generic `Request::assert(payload)` helpers are too permissive for
-component contracts; callers use `MindRequest::signal_verb()` so graph
-creation, graph queries, subscriptions, role release, and channel
-retraction cannot silently travel as `Assert`.
+`SignalVerb` root that frames it. Generic `Request::assert(payload)`
+helpers are too permissive for component contracts; callers use
+`MindRequest::signal_verb()` so graph creation, graph queries,
+subscriptions, role release, and channel retraction cannot silently
+travel as `Assert`.
 
 ```mermaid
 flowchart LR
@@ -232,8 +230,7 @@ The endpoint and kind vocabulary is typed:
   observation, adjudication, and channel grant/retract traffic. **Includes
   `MessageIngressSubmission`** — the channel kind for the
   `Internal(Message) → Internal(Router)` structural channel that
-  `persona-message-daemon` forwards user-typed messages over. Per
-  `~/primary/reports/designer/143-prototype-readiness-gap-audit.md` §4.6, this
+  `persona-message-daemon` forwards user-typed messages over. This
   variant must be distinct from the generic delivery kinds so audit and
   choreography can tell message ingress from other internal traffic.
 - `ChannelDuration` is `OneShot`, `Permanent`, or `TimeBound(TimestampNanos)`.
@@ -306,7 +303,6 @@ catch-all records.
 
 ## 6.5 · Skeleton honesty (Unimplemented reply)
 
-Per `~/primary/reports/designer/143-prototype-readiness-gap-audit.md` §4.3,
 `MindReply` carries a typed `MindRequestUnimplemented(MindUnimplementedReason)`
 variant. Prototype-time mind decodes every `MindRequest` variant; for choreography
 ops or other variants whose behavior is not yet built (e.g., the
@@ -401,5 +397,4 @@ tests/round_trip.rs     frame round trips, NOTA witnesses, and validation tests
 - `../persona-mind/ARCHITECTURE.md`
 - `../signal-core/ARCHITECTURE.md`
 - `~/primary/protocols/orchestration.md`
-- `~/primary/reports/operator/105-command-line-mind-architecture-survey.md`
 - `~/primary/skills/contract-repo.md`
