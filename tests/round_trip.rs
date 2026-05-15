@@ -7,33 +7,82 @@
 //! length-prefixed Frame.
 
 use nota_codec::{Decoder, Encoder, Error as NotaError, NotaDecode, NotaEncode};
-use signal_core::{FrameBody, Reply, Request, SignalVerb};
+use signal_core::{
+    ExchangeIdentifier, ExchangeLane, LaneSequence, NonEmpty, Reply, RequestPayload, SessionEpoch,
+    SignalVerb, StreamEventIdentifier, SubReply, SubscriptionTokenInner,
+};
 use signal_persona_auth::{ChannelId, ComponentName, ConnectionClass, MessageOrigin};
 use signal_persona_mind::*;
 
 // ─── Helpers ──────────────────────────────────────────────
 
+fn exchange() -> ExchangeIdentifier {
+    ExchangeIdentifier::new(
+        SessionEpoch::new(1),
+        ExchangeLane::Connector,
+        LaneSequence::first(),
+    )
+}
+
+fn stream_event() -> StreamEventIdentifier {
+    StreamEventIdentifier::new(
+        SessionEpoch::new(1),
+        ExchangeLane::Acceptor,
+        LaneSequence::first(),
+    )
+}
+
 fn round_trip_request(request: MindRequest) -> MindRequest {
     let expected_verb = request.signal_verb();
-    let frame = Frame::new(FrameBody::Request(request.into_signal_request()));
+    let frame = MindFrame::new(MindFrameBody::Request {
+        exchange: exchange(),
+        request: request.into_request(),
+    });
     let bytes = frame.encode_length_prefixed().expect("encode");
-    let decoded = Frame::decode_length_prefixed(&bytes).expect("decode");
+    let decoded = MindFrame::decode_length_prefixed(&bytes).expect("decode");
     match decoded.into_body() {
-        FrameBody::Request(Request::Operation { verb, payload }) => {
-            assert_eq!(verb, expected_verb);
-            payload
+        MindFrameBody::Request { request, .. } => {
+            let operation = request.operations().head();
+            assert_eq!(operation.verb, expected_verb);
+            operation.payload.clone()
         }
         other => panic!("expected request operation, got {other:?}"),
     }
 }
 
 fn round_trip_reply(reply: MindReply) -> MindReply {
-    let frame = Frame::new(FrameBody::Reply(Reply::operation(reply)));
+    let frame = MindFrame::new(MindFrameBody::Reply {
+        exchange: exchange(),
+        reply: Reply::completed(NonEmpty::single(SubReply::Ok {
+            verb: SignalVerb::Match,
+            payload: reply,
+        })),
+    });
     let bytes = frame.encode_length_prefixed().expect("encode");
-    let decoded = Frame::decode_length_prefixed(&bytes).expect("decode");
+    let decoded = MindFrame::decode_length_prefixed(&bytes).expect("decode");
     match decoded.into_body() {
-        FrameBody::Reply(Reply::Operation(reply)) => reply,
+        MindFrameBody::Reply { reply, .. } => match reply {
+            Reply::Accepted { per_operation, .. } => match per_operation.into_head() {
+                SubReply::Ok { payload, .. } => payload,
+                other => panic!("expected accepted reply payload, got {other:?}"),
+            },
+            other => panic!("expected accepted reply, got {other:?}"),
+        },
         other => panic!("expected reply operation, got {other:?}"),
+    }
+}
+
+fn round_trip_event(event: MindEvent) -> MindEvent {
+    let frame = MindFrame::new(MindFrameBody::SubscriptionEvent {
+        event_identifier: stream_event(),
+        token: SubscriptionTokenInner::new(1),
+        event,
+    });
+    let bytes = frame.encode_length_prefixed().expect("encode");
+    let decoded = MindFrame::decode_length_prefixed(&bytes).expect("decode");
+    match decoded.into_body() {
+        MindFrameBody::SubscriptionEvent { event, .. } => event,
+        other => panic!("expected subscription event, got {other:?}"),
     }
 }
 
@@ -604,7 +653,7 @@ fn subscription_replies_round_trip() {
             MindSnapshot::Relation(fixture.relation()),
         ],
     });
-    let event = MindReply::SubscriptionEvent(SubscriptionEvent {
+    let event = MindEvent::SubscriptionDelta(SubscriptionEvent {
         subscription: SubscriptionId::new("sub-aab"),
         delta: MindDelta::ThoughtCommitted(Thought {
             body: fixture.decision_body(),
@@ -614,7 +663,8 @@ fn subscription_replies_round_trip() {
     });
 
     assert_eq!(round_trip_reply(accepted.clone()), accepted);
-    assert_eq!(round_trip_reply(event.clone()), event);
+    assert_eq!(round_trip_event(event.clone()), event);
+    assert_eq!(event.stream_kind(), MindStreamKind::MindEventStream);
 }
 
 #[test]
@@ -1574,21 +1624,21 @@ fn channel_choreography_replies_round_trip() {
 }
 
 #[test]
-fn from_impl_lifts_opening_into_request() {
+fn explicit_variant_lifts_opening_into_request() {
     let opening = Opening {
         kind: ItemKind::Question,
         priority: ItemPriority::Normal,
         title: Title::new("Choose migration order"),
         body: TextBody::new("Need a decision before implementation."),
     };
-    let request: MindRequest = opening.clone().into();
+    let request = MindRequest::Opening(opening.clone());
     assert_eq!(request, MindRequest::Opening(opening));
 }
 
 #[test]
-fn from_impl_lifts_view_into_reply() {
+fn explicit_variant_lifts_view_into_reply() {
     let view = MemoryFixture::new().view();
-    let reply: MindReply = view.clone().into();
+    let reply = MindReply::View(view.clone());
     assert_eq!(reply, MindReply::View(view));
 }
 
