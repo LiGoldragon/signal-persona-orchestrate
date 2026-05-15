@@ -17,13 +17,20 @@ channel carries:
 ## Quick reference
 
 ```rust
+use signal_core::{
+    ExchangeIdentifier, ExchangeLane, LaneSequence, RequestPayload, SessionEpoch,
+};
 use signal_persona_mind::{
-    Frame, MindRequest, RoleClaim, RoleName, ScopeReason,
+    MindFrame, MindFrameBody, MindRequest, RoleClaim, RoleName, ScopeReason,
     ScopeReference, WirePath,
 };
-use signal_core::FrameBody;
 
 // Designer claims a path and a task scope
+let exchange = ExchangeIdentifier::new(
+    SessionEpoch::new(1),
+    ExchangeLane::Connector,
+    LaneSequence::first(),
+);
 let request = MindRequest::RoleClaim(RoleClaim {
     role: RoleName::Designer,
     scopes: vec![
@@ -33,7 +40,10 @@ let request = MindRequest::RoleClaim(RoleClaim {
     ],
     reason: ScopeReason::from_text("rescope per /91 §3.1")?,
 });
-let frame = Frame::new(FrameBody::Request(request.into_signal_request()));
+let frame = MindFrame::new(MindFrameBody::Request {
+    exchange,
+    request: request.into_request(),
+});
 let bytes = frame.encode_length_prefixed()?;
 // hand to persona-mind's CLI dispatcher
 ```
