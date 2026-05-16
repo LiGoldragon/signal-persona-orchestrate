@@ -896,6 +896,17 @@ pub struct SubscriptionEvent {
     pub delta: MindDelta,
 }
 
+/// Typed acknowledgement that a mind-graph subscription has been retracted.
+///
+/// Returned in reply to `MindRequest::SubscriptionRetraction(SubscriptionId)`.
+/// Carries the retracted subscription so callers can match the ack to the
+/// request they sent. Matches the Path A pattern used by `signal-criome` and
+/// `signal-persona-terminal`.
+#[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
+pub struct SubscriptionRetracted {
+    pub subscription: SubscriptionId,
+}
+
 #[derive(Archive, RkyvSerialize, RkyvDeserialize, NotaRecord, Debug, Clone, PartialEq, Eq)]
 pub struct MindRequestUnimplemented {
     pub reason: MindUnimplementedReason,

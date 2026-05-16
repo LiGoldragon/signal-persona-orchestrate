@@ -98,6 +98,7 @@ signal_channel! {
             ThoughtList(ThoughtList),
             RelationList(RelationList),
             SubscriptionAccepted(SubscriptionAccepted),
+            SubscriptionRetracted(SubscriptionRetracted),
             ClaimAcceptance(ClaimAcceptance),
             ClaimRejection(ClaimRejection),
             ReleaseAcknowledgment(ReleaseAcknowledgment),
@@ -170,8 +171,16 @@ They belong only to the temporary workspace workflow until agents switch to
 | `SubmitRelation` | `RelationCommitted` |
 | `QueryThoughts` | `ThoughtList` |
 | `QueryRelations` | `RelationList` |
-| `SubscribeThoughts` | `SubscriptionAccepted`, then `SubscriptionEvent` |
-| `SubscribeRelations` | `SubscriptionAccepted`, then `SubscriptionEvent` |
+| `SubscribeThoughts` | `SubscriptionAccepted`, then `SubscriptionDelta` events, terminated by `SubscriptionRetracted` |
+| `SubscribeRelations` | `SubscriptionAccepted`, then `SubscriptionDelta` events, terminated by `SubscriptionRetracted` |
+
+Subscription close follows the `signal_channel!` streaming grammar. The
+`Subscribe` request opens the stream; the consumer sends a typed
+`MindRequest::SubscriptionRetraction(SubscriptionId)` request to close it;
+the producer emits `MindReply::SubscriptionRetracted` as the final
+acknowledgement before the stream ends. Both the retract request and the
+retracted reply are first-class — `signal_channel!` derives the
+`MindRequest::closed_stream()` discriminant from this pairing.
 
 The graph surface is the first typed substrate for replacing BEADS and later
 rendering reports/architecture/skills from mind state. The closed node family
@@ -232,6 +241,15 @@ channel is missing or inactive and submits `AdjudicationRequest`. Mind replies
 by recording the request, deciding policy internally, and later emitting a
 grant, extension, retraction, deny, or channel view through the same closed
 contract vocabulary.
+
+The destination handler set inside `persona-mind` is a single stateful
+`ChoreographyAdjudicator` actor that owns policy, the live grant table, and the
+adjudication log. `AdjudicationRequest`, `ChannelGrant`, `ChannelExtend`,
+`ChannelRetract`, `AdjudicationDeny`, and `ChannelList` all route to that one
+actor; it answers with the receipt or view reply for each. This contract owns
+only the request/reply vocabulary that crosses the channel; the actor and its
+state shape belong to `persona-mind`. Until that actor lands, mind replies
+`MindRequestUnimplemented(ChoreographyPolicyMissing)` for this family.
 
 The endpoint and kind vocabulary is typed:
 
@@ -353,6 +371,13 @@ MindUnimplementedReason
   transport, or migration implementation.
 - The text surface is NOTA projected into these exact records; there is no
   second command language.
+- Subscription close uses the streaming grammar: a `Subscribe` request opens
+  the stream; a typed `Retract SubscriptionRetraction(SubscriptionId)`
+  request closes it; the producer emits `MindReply::SubscriptionRetracted`
+  as the final acknowledgement before the stream ends.
+- Channel-choreography requests route inside `persona-mind` to one stateful
+  `ChoreographyAdjudicator` actor; this contract closes the vocabulary, the
+  actor owns the policy and grant state.
 
 ## 8 · Tests
 
@@ -382,6 +407,7 @@ Additional architecture guards still worth adding:
 | `request_payload_cannot_carry_timestamp` | store mints time. |
 | `request_payload_cannot_carry_event_sequence` | store mints sequence. |
 | `contract_crate_cannot_spawn_actor_runtime` | contract crate stays behavior-free. |
+| `subscription_retracted_round_trips_as_reply` | Path A reply-side close is wired in `MindReply` and `MindEventStream::close`. |
 
 ## 9 · Non-ownership
 

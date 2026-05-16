@@ -1778,6 +1778,7 @@ signal_channel! {
             ThoughtList(ThoughtList),
             RelationList(RelationList),
             SubscriptionAccepted(SubscriptionAccepted),
+            SubscriptionRetracted(SubscriptionRetracted),
             ClaimAcceptance(ClaimAcceptance),
             ClaimRejection(ClaimRejection),
             ReleaseAcknowledgment(ReleaseAcknowledgment),

@@ -653,6 +653,9 @@ fn subscription_replies_round_trip() {
             MindSnapshot::Relation(fixture.relation()),
         ],
     });
+    let retracted = MindReply::SubscriptionRetracted(SubscriptionRetracted {
+        subscription: SubscriptionId::new("sub-aab"),
+    });
     let event = MindEvent::SubscriptionDelta(SubscriptionEvent {
         subscription: SubscriptionId::new("sub-aab"),
         delta: MindDelta::ThoughtCommitted(Thought {
@@ -663,8 +666,48 @@ fn subscription_replies_round_trip() {
     });
 
     assert_eq!(round_trip_reply(accepted.clone()), accepted);
+    assert_eq!(round_trip_reply(retracted.clone()), retracted);
     assert_eq!(round_trip_event(event.clone()), event);
     assert_eq!(event.stream_kind(), MindStreamKind::MindEventStream);
+}
+
+/// The streaming subscription contract pairs `Subscribe*` (opens) with
+/// `SubscriptionRetraction` (close request) and `SubscriptionRetracted`
+/// (final ack reply). The `signal_channel!` macro emits the
+/// `opened_stream()` and `closed_stream()` discriminants from that
+/// pairing; this test pins both halves so a future refactor that drops
+/// the request-side retract verb in favor of a producer-only close
+/// breaks compilation and review.
+#[test]
+fn subscribe_opens_and_subscription_retraction_closes_the_mind_event_stream() {
+    let subscribe_thoughts = MindRequest::SubscribeThoughts(SubscribeThoughts {
+        filter: ThoughtFilter::InMemory(InMemory {
+            memory: RecordId::new("memory-aab"),
+        }),
+    });
+    let subscribe_relations = MindRequest::SubscribeRelations(SubscribeRelations {
+        filter: RelationFilter::ByTarget(ByRelationTarget {
+            target: RecordId::new("goal-aab"),
+        }),
+    });
+    let retract = MindRequest::SubscriptionRetraction(SubscriptionId::new("sub-aab"));
+
+    assert_eq!(
+        subscribe_thoughts.opened_stream(),
+        Some(MindStreamKind::MindEventStream),
+    );
+    assert_eq!(
+        subscribe_relations.opened_stream(),
+        Some(MindStreamKind::MindEventStream),
+    );
+    assert_eq!(
+        retract.closed_stream(),
+        Some(MindStreamKind::MindEventStream),
+    );
+    assert_eq!(subscribe_thoughts.closed_stream(), None);
+    assert_eq!(retract.opened_stream(), None);
+
+    assert_eq!(round_trip_request(retract.clone()), retract);
 }
 
 #[test]
